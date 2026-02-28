@@ -93,22 +93,22 @@ export default function DataAuditPage() {
 
       {/* Summary */}
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <p className="text-xs uppercase tracking-wider text-gray-500">Total Songs</p>
           <p className="mt-1 text-2xl font-bold text-white">{audit.totalSongs}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <p className="text-xs uppercase tracking-wider text-gray-500">Total Streams</p>
           <p className="mt-1 text-2xl font-bold text-white">{formatNumber(audit.totalStreams)}</p>
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <p className="text-xs uppercase tracking-wider text-gray-500">Duplicates Found</p>
           <p className="mt-1 text-2xl font-bold text-white">{audit.duplicateSongs.length}</p>
         </div>
       </div>
 
       {/* Per-Artist Breakdown */}
-      <div className="mt-6 rounded-lg border border-gray-800 bg-gray-900 p-5">
+      <div className="mt-6 rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Songs by Artist</h3>
         <div className="space-y-2">
           {Object.entries(audit.songsByArtist).map(([name, count]) => (
@@ -122,7 +122,7 @@ export default function DataAuditPage() {
 
       {/* Null Fields */}
       <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
             Missing ISRC ({audit.nullFields.missingISRC.length})
           </h3>
@@ -136,7 +136,7 @@ export default function DataAuditPage() {
             </ul>
           )}
         </div>
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
             Zero Streams ({audit.nullFields.missingStreams.length})
           </h3>
@@ -154,7 +154,7 @@ export default function DataAuditPage() {
 
       {/* Duplicates */}
       {audit.duplicateSongs.length > 0 && (
-        <div className="mt-6 rounded-lg border border-gray-800 bg-gray-900 p-5">
+        <div className="mt-6 rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Duplicate Songs</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">

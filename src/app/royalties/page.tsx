@@ -79,10 +79,10 @@ export default function RoyaltiesPage() {
 
   return (
     <div>
-      <PageHeader title="Royalties" />
+      <PageHeader title="Revenue" />
 
       {/* Total */}
-      <div className="mt-6 rounded-lg border border-gray-800 bg-gray-900 p-6 text-center">
+      <div className="mt-6 rounded-xl border border-gray-700/50 bg-gray-800/50 p-6 text-center">
         <p className="text-xs uppercase tracking-wider text-gray-500">Total Revenue</p>
         <p className="mt-1 text-4xl font-bold text-white">{formatCurrency(totalRevenue)}</p>
         <p className="mt-1 text-sm text-gray-400">{entries.length} entries</p>
@@ -90,7 +90,7 @@ export default function RoyaltiesPage() {
 
       <div className="mt-8 grid gap-6 md:grid-cols-2">
         {/* Revenue by Source */}
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Revenue by Source</h2>
           <div className="space-y-2">
             {sourceEntries.map(([source, amount]) => (
@@ -109,7 +109,7 @@ export default function RoyaltiesPage() {
         </div>
 
         {/* Revenue by Quarter */}
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Revenue by Quarter</h2>
           <div className="space-y-2">
             {quarterEntries.map(([quarter, amount]) => (

@@ -21,19 +21,10 @@ export default function CollaboratorDetailPage() {
     setError(null);
 
     fetch(`/api/collaborators/${slug}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(r.status === 404 ? 'Collaborator not found' : `Fetch failed: ${r.status}`);
-        return r.json();
-      })
-      .then((data) => {
-        if (!cancelled) setCollaborator(data);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+      .then(r => { if (!r.ok) throw new Error(r.status === 404 ? 'Collaborator not found' : `Fetch failed: ${r.status}`); return r.json(); })
+      .then(data => { if (!cancelled) setCollaborator(data); })
+      .catch(err => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
 
     return () => { cancelled = true; };
   }, [slug]);
@@ -42,15 +33,8 @@ export default function CollaboratorDetailPage() {
     return (
       <div>
         <PageHeader title="Collaborator" />
-        <div className="mt-6 rounded-lg border border-red-800 bg-red-950/50 p-4 text-red-300">
-          {error}
-        </div>
-        <Link
-          href={artist !== 'all' ? `/collaborators?artist=${artistToParam(artist)}` : '/collaborators'}
-          className="mt-4 inline-block text-sm text-purple-400 hover:underline"
-        >
-          Back to Collaborators
-        </Link>
+        <div className="mt-6 rounded-lg border border-red-800 bg-red-950/50 p-4 text-red-300">{error}</div>
+        <Link href={artist !== 'all' ? `/collaborators?artist=${artistToParam(artist)}` : '/collaborators'} className="mt-4 inline-block text-sm text-orange-400 hover:underline">&larr; Back to Collaborators</Link>
       </div>
     );
   }
@@ -60,8 +44,8 @@ export default function CollaboratorDetailPage() {
       <div>
         <PageHeader title="Collaborator" />
         <div className="mt-6 space-y-4">
-          <div className="h-32 animate-pulse rounded-lg bg-gray-800/50" />
-          <div className="h-48 animate-pulse rounded-lg bg-gray-800/50" />
+          <div className="h-32 animate-pulse rounded-xl bg-gray-800/50" />
+          <div className="h-48 animate-pulse rounded-xl bg-gray-800/50" />
         </div>
       </div>
     );
@@ -70,32 +54,25 @@ export default function CollaboratorDetailPage() {
   return (
     <div>
       <div className="mb-4">
-        <Link
-          href={artist !== 'all' ? `/collaborators?artist=${artistToParam(artist)}` : '/collaborators'}
-          className="text-sm text-gray-400 hover:text-white"
-        >
-          {'\u2190'} Back to Collaborators
-        </Link>
+        <Link href={artist !== 'all' ? `/collaborators?artist=${artistToParam(artist)}` : '/collaborators'} className="text-sm text-gray-400 hover:text-white">&larr; Back to Collaborators</Link>
       </div>
 
       <PageHeader title={collaborator.name} />
 
       {/* Profile Card */}
-      <div className="mt-6 rounded-lg border border-gray-800 bg-gray-900 p-6">
+      <div className="mt-6 rounded-xl border border-gray-700/50 bg-gray-800/50 p-6">
         <div className="grid gap-4 md:grid-cols-2">
-          <dl className="space-y-2">
-            <div className="flex justify-between">
-              <dt className="text-sm text-gray-500">Roles</dt>
-              <dd className="text-sm text-white">{collaborator.roles.join(', ') || '\u2014'}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-sm text-gray-500">PRO Affiliation</dt>
-              <dd className="text-sm text-white">{collaborator.pro_affiliation ?? '\u2014'}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-sm text-gray-500">IPI Number</dt>
-              <dd className="text-sm text-white">{collaborator.ipi_number ?? '\u2014'}</dd>
-            </div>
+          <dl className="space-y-3">
+            {[
+              { label: 'Roles', value: collaborator.roles.join(', ') || null },
+              { label: 'PRO Affiliation', value: collaborator.pro_affiliation },
+              { label: 'IPI Number', value: collaborator.ipi_number },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex justify-between">
+                <dt className="text-sm text-gray-500">{label}</dt>
+                <dd className="text-sm text-white">{value ?? '\u2014'}</dd>
+              </div>
+            ))}
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Agreement Status</dt>
               <dd>
@@ -107,19 +84,17 @@ export default function CollaboratorDetailPage() {
               </dd>
             </div>
           </dl>
-          <dl className="space-y-2">
-            <div className="flex justify-between">
-              <dt className="text-sm text-gray-500">Email</dt>
-              <dd className="text-sm text-white">{collaborator.email ?? '\u2014'}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-sm text-gray-500">Phone</dt>
-              <dd className="text-sm text-white">{collaborator.phone ?? '\u2014'}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-sm text-gray-500">Song Count</dt>
-              <dd className="text-sm text-white">{collaborator.song_count}</dd>
-            </div>
+          <dl className="space-y-3">
+            {[
+              { label: 'Email', value: collaborator.email },
+              { label: 'Phone', value: collaborator.phone },
+              { label: 'Song Count', value: collaborator.song_count.toString() },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex justify-between">
+                <dt className="text-sm text-gray-500">{label}</dt>
+                <dd className="text-sm text-white">{value ?? '\u2014'}</dd>
+              </div>
+            ))}
           </dl>
         </div>
       </div>
@@ -137,15 +112,10 @@ export default function CollaboratorDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {collaborator.songs.map((s) => (
+                {collaborator.songs.map(s => (
                   <tr key={s.slug} className="border-b border-gray-800/50 transition-colors hover:bg-gray-800/30">
                     <td className="px-3 py-3">
-                      <Link
-                        href={artist !== 'all' ? `/catalog/${s.slug}?artist=${artistToParam(artist)}` : `/catalog/${s.slug}`}
-                        className="text-white hover:text-purple-400"
-                      >
-                        {s.title}
-                      </Link>
+                      <Link href={artist !== 'all' ? `/catalog/${s.slug}?artist=${artistToParam(artist)}` : `/catalog/${s.slug}`} className="text-white hover:text-orange-400">{s.title}</Link>
                     </td>
                     <td className="px-3 py-3 text-gray-400">{s.artist}</td>
                   </tr>
