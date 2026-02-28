@@ -22,7 +22,7 @@ function mapPageToCollaborator(page: PageObjectResponse): CollaboratorDetail {
     id: page.id,
     name,
     slug: toSlug(name),
-    roles: getMultiSelect(p['Roles']) ?? getMultiSelect(p['Role']),
+    roles: getMultiSelect(p['Role']),
     pro_affiliation: getSelect(p['PRO Affiliation']) ?? getText(p['PRO Affiliation']),
     ipi_number: getText(p['IPI Number']),
     email: getEmail(p['Email']),
