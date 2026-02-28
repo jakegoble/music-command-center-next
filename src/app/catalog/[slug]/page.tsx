@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { useArtistContext } from '@/lib/contexts/ArtistContext';
 import { artistToParam, ARTIST_COLORS, type Artist } from '@/config/notion';
 import type { SongDetail } from '@/lib/types';
+import { PRESS_COVERAGE, type PressCoverage } from '@/lib/data/press-coverage';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -40,16 +41,16 @@ function CopyButton({ text }: { text: string }) {
 function SongHero({ song }: { song: SongDetail }) {
   const color = song.artist ? (ARTIST_COLORS[song.artist as Artist] ?? '#6b7280') : '#6b7280';
   const initials = song.title.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const { artist } = useArtistContext();
+  const albumSlug = song.album_ep ? song.album_ep.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : null;
 
   return (
     <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
         {/* Artwork */}
-        {song.spotify_link ? (
-          <div className="h-[150px] w-[150px] shrink-0 overflow-hidden rounded-xl bg-gray-900 shadow-lg md:h-[200px] md:w-[200px]">
-            <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-gray-600" style={{ background: `linear-gradient(135deg, ${color}33, ${color}11)` }}>
-              {initials}
-            </div>
+        {song.artwork_url ? (
+          <div className="h-[150px] w-[150px] shrink-0 overflow-hidden rounded-xl shadow-lg md:h-[200px] md:w-[200px]">
+            <img src={song.artwork_url} alt={song.title} className="h-full w-full object-cover" />
           </div>
         ) : (
           <div className="flex h-[150px] w-[150px] shrink-0 items-center justify-center rounded-xl shadow-lg md:h-[200px] md:w-[200px]" style={{ background: `linear-gradient(135deg, ${color}44, ${color}11)` }}>
@@ -66,8 +67,20 @@ function SongHero({ song }: { song: SongDetail }) {
               song.status === 'In Progress' ? 'bg-orange-900/50 text-orange-300' :
               'bg-amber-900/50 text-amber-300'
             }`}>{song.status}</span>
-            {song.album_ep && <span className="text-sm text-gray-400">{song.album_ep}</span>}
           </div>
+
+          {/* Album link */}
+          {song.album_ep && albumSlug && (
+            <div className="mt-2">
+              <span className="text-sm text-gray-400">from </span>
+              <Link
+                href={artist !== 'all' ? `/catalog/albums/${albumSlug}?artist=${artistToParam(artist)}` : `/catalog/albums/${albumSlug}`}
+                className="text-sm font-medium text-orange-400 hover:underline"
+              >
+                {song.album_ep}
+              </Link>
+            </div>
+          )}
 
           {/* Metadata chips */}
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-400">
@@ -116,66 +129,193 @@ function SongHero({ song }: { song: SongDetail }) {
 
 // --- Tab: Overview ---
 function OverviewTab({ song }: { song: SongDetail }) {
+  const descriptionText = song.generated_description
+    ?? song.parsed_notes?.description
+    ?? null;
+
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {/* About / Notes */}
-      {song.notes && (
-        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5 md:col-span-2">
+    <div className="space-y-4">
+      {/* Track Description */}
+      {descriptionText && (
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">About</h3>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-300">{song.notes}</p>
+          <p className="text-sm leading-relaxed text-gray-300">{descriptionText}</p>
         </div>
       )}
 
-      {/* Similar Artists + Scene */}
-      {(song.similar_artists || song.scene_suggestions) && (
+      {/* Release Info + Technical — 2-column grid */}
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-          {song.similar_artists && (
-            <>
-              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-gray-400">Similar Artists</h3>
-              <div className="flex flex-wrap gap-1.5">
-                {song.similar_artists.split(',').map(a => (
-                  <span key={a.trim()} className="rounded-full bg-blue-900/30 px-2.5 py-0.5 text-xs text-blue-300">{a.trim()}</span>
-                ))}
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Release Info</h3>
+          <dl className="space-y-2">
+            {([
+              { label: 'Release Date', value: song.release_date },
+              { label: 'Distributor', value: song.distributor },
+              { label: 'Album / EP', value: song.album_ep },
+              { label: 'Status', value: song.status },
+              { label: 'Label', value: song.parsed_notes?.label_info },
+              { label: 'Producers', value: song.producers },
+              { label: 'Songwriters', value: song.songwriters },
+            ] as { label: string; value: string | null | undefined }[]).map(({ label, value }) => (
+              <div key={label} className="flex justify-between">
+                <dt className="text-sm text-gray-500">{label}</dt>
+                <dd className="text-right text-sm text-white">{value ?? '\u2014'}</dd>
               </div>
-            </>
-          )}
-          {song.scene_suggestions && (
-            <>
-              <h3 className="mb-2 mt-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Scene Suggestions</h3>
-              <p className="text-sm text-gray-300">{song.scene_suggestions}</p>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Usage Scenarios */}
-      {song.usage_scenarios.length > 0 && (
-        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Usage Scenarios</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {song.usage_scenarios.map(s => (
-              <div key={s} className="rounded-lg bg-gray-900/50 px-3 py-2 text-xs text-gray-300">{s}</div>
             ))}
+          </dl>
+        </div>
+
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Technical</h3>
+          <dl className="space-y-2">
+            {([
+              { label: 'BPM', value: song.bpm ? String(song.bpm) : null },
+              { label: 'Key', value: song.key },
+              { label: 'Duration', value: song.duration },
+              { label: 'Explicit', value: song.explicit ? 'Yes' : 'No' },
+            ] as { label: string; value: string | null }[]).map(({ label, value }) => (
+              <div key={label} className="flex justify-between">
+                <dt className="text-sm text-gray-500">{label}</dt>
+                <dd className="text-sm text-white">{value ?? '\u2014'}</dd>
+              </div>
+            ))}
+          </dl>
+          {/* Identifiers */}
+          <div className="mt-4 space-y-2 border-t border-gray-700/50 pt-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">ISRC</span>
+              <span className="flex items-center">
+                <code className="font-mono text-xs text-white">{song.isrc ?? '\u2014'}</code>
+                {song.isrc && <CopyButton text={song.isrc} />}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">UPC</span>
+              <span className="flex items-center">
+                <code className="font-mono text-xs text-white">{song.upc ?? '\u2014'}</code>
+                {song.upc && <CopyButton text={song.upc} />}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Discovery — Genre, Mood, Similar Artists, Scenes, Usage */}
+      {(song.genre.length > 0 || song.mood.length > 0 || song.similar_artists || song.scene_suggestions || song.usage_scenarios.length > 0) && (
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Discovery</h3>
+          <div className="space-y-4">
+            {/* Genre pills */}
+            {song.genre.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs text-gray-500">Genre</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {song.genre.map(g => (
+                    <span key={g} className="rounded-full bg-purple-900/30 px-2.5 py-0.5 text-xs text-purple-300">{g}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Mood pills */}
+            {song.mood.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs text-gray-500">Mood</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {song.mood.map(m => (
+                    <span key={m} className="rounded-full bg-cyan-900/30 px-2.5 py-0.5 text-xs text-cyan-300">{m}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Similar Artists */}
+            {song.similar_artists && (
+              <div>
+                <p className="mb-1.5 text-xs text-gray-500">Similar Artists</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {song.similar_artists.split(',').map(a => (
+                    <span key={a.trim()} className="rounded-full bg-blue-900/30 px-2.5 py-0.5 text-xs text-blue-300">{a.trim()}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Scene Suggestions */}
+            {song.scene_suggestions && (
+              <div>
+                <p className="mb-1.5 text-xs text-gray-500">Scene Suggestions</p>
+                <p className="text-sm text-gray-300">{song.scene_suggestions}</p>
+              </div>
+            )}
+
+            {/* Usage Scenarios */}
+            {song.usage_scenarios.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs text-gray-500">Usage Scenarios</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {song.usage_scenarios.map(s => (
+                    <span key={s} className="rounded-lg bg-gray-900/50 px-2.5 py-1 text-xs text-gray-300">{s}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Production Details */}
+      {/* Deliverables Grid */}
       <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Production Details</h3>
-        <dl className="space-y-2">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Deliverables</h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
           {[
-            { label: 'Producers', value: song.producers },
-            { label: 'Songwriters', value: song.songwriters },
-            { label: 'Explicit', value: song.explicit ? 'Yes' : 'No' },
-            { label: 'Instrumental', value: song.has_instrumental ? 'Yes' : 'No' },
-          ].map(({ label, value }) => (
+            { label: 'Stereo Master', checked: song.has_stereo_master },
+            { label: 'Instrumental', checked: song.has_instrumental },
+            { label: 'Acapella', checked: song.has_acapella },
+            { label: 'Stems', checked: song.stems_complete },
+            { label: '15s Edit', checked: song.has_15s_edit },
+            { label: '30s Edit', checked: song.has_30s_edit },
+            { label: '60s Edit', checked: song.has_60s_edit },
+            { label: 'Atmos Mix', checked: song.atmos_mix },
+            { label: '360RA', checked: song.has_360ra },
+            { label: 'Project File', checked: song.has_project_file },
+            { label: 'Artwork', checked: song.artwork },
+          ].map(({ label, checked }) => (
+            <div key={label} className="flex items-center gap-2 rounded-lg bg-gray-900/50 px-3 py-2">
+              <CheckIcon checked={checked} />
+              <span className="text-xs text-gray-300">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Publishing / Ownership */}
+      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Publishing & Ownership</h3>
+        <dl className="space-y-2">
+          {([
+            { label: 'Publisher', value: song.publisher },
+            { label: 'Master Ownership', value: song.master_ownership },
+          ] as { label: string; value: string | null }[]).map(({ label, value }) => (
             <div key={label} className="flex justify-between">
               <dt className="text-sm text-gray-500">{label}</dt>
               <dd className="text-sm text-white">{value ?? '\u2014'}</dd>
             </div>
           ))}
         </dl>
+        {song.writer_splits_parsed.length > 0 && (
+          <>
+            <h4 className="mb-2 mt-4 text-xs font-semibold uppercase text-gray-400">Writer Splits</h4>
+            <div className="space-y-1">
+              {song.writer_splits_parsed.map((s, i) => (
+                <div key={i} className="flex items-center justify-between rounded bg-gray-900/50 px-2 py-1">
+                  <span className="text-xs text-gray-300">{s.name}</span>
+                  <span className="text-xs font-medium text-white">{s.percentage}%</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -518,33 +658,132 @@ function ContractsTab({ song }: { song: SongDetail }) {
   );
 }
 
-// --- Tab: Press (NEW) ---
-function PressTab() {
+// --- Tab: Press ---
+function PressTab({ song }: { song: SongDetail }) {
+  // Find press for this specific song, then fallback to artist-level coverage
+  const songPress = PRESS_COVERAGE.filter(
+    p => p.song && p.song.toLowerCase() === song.title.toLowerCase()
+  );
+  const artistPress = PRESS_COVERAGE.filter(
+    p => p.artist.toLowerCase() === song.artist.toLowerCase() && !p.song
+  );
+  const allPress = [...songPress, ...artistPress];
+
+  if (allPress.length === 0) {
+    return (
+      <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
+        <p className="text-lg font-medium text-gray-400">No press coverage found.</p>
+        <p className="mt-2 text-sm text-gray-500">Press articles for this song or artist will appear here.</p>
+      </div>
+    );
+  }
+
+  const typeColors: Record<PressCoverage['type'], string> = {
+    Feature: 'bg-purple-900/50 text-purple-300',
+    Review: 'bg-blue-900/50 text-blue-300',
+    Interview: 'bg-green-900/50 text-green-300',
+    Mention: 'bg-gray-700/50 text-gray-300',
+  };
+
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
-      <p className="text-lg font-medium text-gray-400">No press coverage linked.</p>
-      <p className="mt-2 text-sm text-gray-500">Add a &ldquo;Press Links&rdquo; field in Notion to populate this section.</p>
+    <div className="space-y-3">
+      {songPress.length > 0 && (
+        <p className="text-xs text-gray-500 uppercase tracking-wider">Coverage for &ldquo;{song.title}&rdquo;</p>
+      )}
+      {songPress.map((p, i) => (
+        <a
+          key={`song-${i}`}
+          href={p.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 transition-colors hover:border-gray-600"
+        >
+          <div>
+            <p className="font-medium text-white">{p.outlet}</p>
+            <p className="mt-0.5 text-xs text-gray-400">{p.title}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeColors[p.type]}`}>{p.type}</span>
+            <span className="text-gray-500">&rarr;</span>
+          </div>
+        </a>
+      ))}
+      {artistPress.length > 0 && songPress.length > 0 && (
+        <p className="mt-4 text-xs text-gray-500 uppercase tracking-wider">More from {song.artist}</p>
+      )}
+      {artistPress.length > 0 && songPress.length === 0 && (
+        <p className="text-xs text-gray-500 uppercase tracking-wider">Press for {song.artist}</p>
+      )}
+      {artistPress.map((p, i) => (
+        <a
+          key={`artist-${i}`}
+          href={p.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 transition-colors hover:border-gray-600"
+        >
+          <div>
+            <p className="font-medium text-white">{p.outlet}</p>
+            <p className="mt-0.5 text-xs text-gray-400">{p.title}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeColors[p.type]}`}>{p.type}</span>
+            <span className="text-gray-500">&rarr;</span>
+          </div>
+        </a>
+      ))}
     </div>
   );
 }
 
-// --- Tab: Video (NEW) ---
-function VideoTab() {
+// --- Tab: Video ---
+function VideoTab({ song }: { song: SongDetail }) {
+  const hasYouTube = !!song.youtube_link;
+
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
-      <p className="text-lg font-medium text-gray-400">No video content linked.</p>
-      <p className="mt-2 text-sm text-gray-500">Add video URL fields in Notion to populate this section.</p>
-      <div className="mt-6 grid grid-cols-2 gap-3 opacity-30 md:grid-cols-3">
-        {['Instagram', 'TikTok', 'YouTube'].map(platform => (
-          <div key={platform} className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
-            <div className="mb-2 h-20 rounded bg-gray-700" />
-            <p className="text-xs text-gray-500">{platform}</p>
-            <p className="text-xs text-gray-600">0 views</p>
+    <div className="space-y-4">
+      {hasYouTube && (
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">YouTube</h3>
+          <div className="aspect-video overflow-hidden rounded-lg bg-gray-900">
+            {song.youtube_link?.includes('youtu') ? (
+              <iframe
+                src={`https://www.youtube.com/embed/${extractYouTubeId(song.youtube_link)}`}
+                className="h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title={`${song.title} - YouTube`}
+              />
+            ) : (
+              <a href={song.youtube_link!} target="_blank" rel="noopener noreferrer" className="flex h-full w-full items-center justify-center text-sm text-gray-400 hover:text-white">
+                Watch on YouTube &rarr;
+              </a>
+            )}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {!hasYouTube && (
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
+          <p className="text-lg font-medium text-gray-400">No video content linked.</p>
+          <p className="mt-2 text-sm text-gray-500">Add video URLs in Notion to populate this section.</p>
+          <div className="mt-6 grid w-full max-w-md grid-cols-3 gap-3 opacity-30">
+            {['YouTube', 'Instagram', 'TikTok'].map(platform => (
+              <div key={platform} className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                <div className="mb-2 aspect-video rounded bg-gray-700" />
+                <p className="text-xs text-gray-500">{platform}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function extractYouTubeId(url: string): string | null {
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([^?&\s]+)/);
+  return match ? match[1] : null;
 }
 
 // --- Main Page ---
@@ -644,8 +883,8 @@ export default function SongDetailPage() {
         {activeTab === 'Revenue' && <RevenueTab song={song} />}
         {activeTab === 'Sync' && <SyncTab song={song} />}
         {activeTab === 'Contracts' && <ContractsTab song={song} />}
-        {activeTab === 'Press' && <PressTab />}
-        {activeTab === 'Video' && <VideoTab />}
+        {activeTab === 'Press' && <PressTab song={song} />}
+        {activeTab === 'Video' && <VideoTab song={song} />}
       </div>
     </div>
   );

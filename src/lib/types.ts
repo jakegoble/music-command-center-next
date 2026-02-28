@@ -71,10 +71,50 @@ export interface SongDetail extends SongSummary {
   sync_restrictions: string | null;
   disco_link: string | null;
   master_ownership: string | null;
+  parsed_notes: {
+    description: string | null;
+    emails: string[];
+    isrcs: string[];
+    upcs: string[];
+    label_info: string | null;
+    urls: string[];
+  } | null;
+  generated_description: string | null;
+  has_stereo_master: boolean;
+  artwork_url: string | null;
   collaborators: CollaboratorSummary[];
   contracts: ContractSummary[];
   licensing_contacts: LicensingContactSummary[];
   royalties: RoyaltyEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Album types
+// ---------------------------------------------------------------------------
+
+export interface AlbumSummary {
+  slug: string;
+  name: string;
+  artist: string;
+  track_count: number;
+  total_streams: number;
+  estimated_revenue: number;
+  release_date: string | null;
+  genres: string[];
+  status: string;
+}
+
+export interface AlbumDetail extends AlbumSummary {
+  tracks: SongSummary[];
+  avg_bpm: number | null;
+  sync_ready_count: number;
+  has_atmos_count: number;
+  has_stems_count: number;
+}
+
+export interface AlbumsResponse {
+  albums: AlbumSummary[];
+  total: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +217,8 @@ export interface CatalogStats {
   artist_distribution: Record<string, number>;
   distributor_distribution: Record<string, number>;
   year_distribution: Record<string, number>;
+  album_distribution: Record<string, number>;
+  total_albums: number;
 }
 
 export interface DataAuditResponse {

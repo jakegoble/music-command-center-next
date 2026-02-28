@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const artistDist: Record<string, number> = {};
     const distributorDist: Record<string, number> = {};
     const yearDist: Record<string, number> = {};
+    const albumDist: Record<string, number> = {};
 
     for (const song of songs) {
       // Artist
@@ -53,6 +54,11 @@ export async function GET(request: NextRequest) {
         const year = new Date(song.release_date).getFullYear().toString();
         yearDist[year] = (yearDist[year] ?? 0) + 1;
       }
+
+      // Album/EP
+      if (song.album_ep) {
+        albumDist[song.album_ep] = (albumDist[song.album_ep] ?? 0) + 1;
+      }
     }
 
     const stats: CatalogStats = {
@@ -72,6 +78,8 @@ export async function GET(request: NextRequest) {
       artist_distribution: artistDist,
       distributor_distribution: distributorDist,
       year_distribution: yearDist,
+      album_distribution: albumDist,
+      total_albums: Object.keys(albumDist).length,
     };
 
     return NextResponse.json(stats);

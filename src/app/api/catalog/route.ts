@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     const yearMin = searchParams.get('year_min') ? parseInt(searchParams.get('year_min')!) : null;
     const yearMax = searchParams.get('year_max') ? parseInt(searchParams.get('year_max')!) : null;
     const search = searchParams.get('search')?.toLowerCase();
+    const albumEp = searchParams.get('album_ep');
 
     // Fetch all songs for this artist (Notion-level artist filter applied)
     const allSongs = await fetchAllSongs(artist);
@@ -101,6 +102,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    if (albumEp) {
+      filtered = filtered.filter((s) => s.album_ep === albumEp);
+    }
+
     if (search) {
       filtered = filtered.filter(
         (s) =>
@@ -111,10 +116,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Sort
+    // Sort (whitelist to prevent sorting on array fields)
+    const SORTABLE = new Set([
+      'title', 'artist', 'status', 'bpm', 'key', 'release_date',
+      'total_streams', 'popularity_score', 'distributor', 'estimated_revenue',
+      'album_ep', 'sync_tier', 'duration',
+    ]);
+    const validSort = SORTABLE.has(sort) ? sort : 'release_date';
+
     filtered.sort((a, b) => {
-      const aVal = (a as unknown as Record<string, unknown>)[sort];
-      const bVal = (b as unknown as Record<string, unknown>)[sort];
+      const aVal = (a as unknown as Record<string, unknown>)[validSort];
+      const bVal = (b as unknown as Record<string, unknown>)[validSort];
 
       if (aVal == null && bVal == null) return 0;
       if (aVal == null) return 1;

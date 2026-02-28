@@ -12,7 +12,9 @@ const NAV_SECTIONS = [
     label: 'MUSIC',
     links: [
       { href: '/', label: 'Dashboard' },
+      { href: '/streaming', label: 'Streaming' },
       { href: '/catalog', label: 'Catalog' },
+      { href: '/catalog/albums', label: 'Albums' },
       { href: '/royalties', label: 'Revenue' },
     ],
   },
@@ -28,6 +30,7 @@ const NAV_SECTIONS = [
     links: [
       { href: '/contracts', label: 'Contracts' },
       { href: '/sync-pipeline', label: 'Sync Pipeline' },
+      { href: '/content', label: 'Content' },
     ],
   },
   {
@@ -35,6 +38,7 @@ const NAV_SECTIONS = [
     links: [
       { href: '/data-audit', label: 'Data Audit' },
       { href: '/ai-insights', label: 'AI Insights' },
+      { href: '/approvals', label: 'Approvals' },
     ],
   },
 ];
@@ -122,7 +126,9 @@ export function Sidebar() {
                 const isActive =
                   link.href === '/'
                     ? pathname === '/'
-                    : pathname.startsWith(link.href);
+                    : link.href === '/catalog'
+                      ? pathname === '/catalog' || (pathname.startsWith('/catalog/') && !pathname.startsWith('/catalog/albums'))
+                      : pathname.startsWith(link.href);
 
                 return (
                   <Link

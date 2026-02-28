@@ -15,17 +15,9 @@ import {
 import { estimateRevenue } from '@/lib/services/revenue';
 import type { SongSummary } from '@/lib/types';
 import type { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints';
+import { toSlug } from '@/lib/utils/slug';
 
-// ---------------------------------------------------------------------------
-// Slug generation
-// ---------------------------------------------------------------------------
-
-export function toSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
+export { toSlug };
 
 // ---------------------------------------------------------------------------
 // Map a Notion page → SongSummary
@@ -64,7 +56,7 @@ export function mapPageToSong(page: PageObjectResponse): SongSummary {
     apple_music_link: getUrl(p['Apple Music Link']),
     youtube_link: getUrl(p['YouTube Link']),
     collaborator_count: getRelationIds(p['Collaborators']).length,
-    contract_count: getRelationIds(p['Contracts & Agreements']).length,
+    contract_count: getRelationIds(p['Contracts']).length,
     estimated_revenue: estimateRevenue(streams),
     ascap_registered: getCheckbox(p['ASCAP Registered']),
     mlc_registered: getCheckbox(p['MLC Registered']),

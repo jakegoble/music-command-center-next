@@ -16,8 +16,24 @@ import {
 } from '@/lib/clients/notion';
 import { estimateRevenue, parseWriterSplits } from '@/lib/services/revenue';
 import { toSlug } from '@/lib/services/songs';
+import { parseNotes } from '@/lib/utils/parseNotes';
+import { generateTrackDescription } from '@/lib/utils/generateDescription';
 import type { SongDetail, CollaboratorSummary, ContractSummary, LicensingContactSummary, RoyaltyEntry } from '@/lib/types';
 import type { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints';
+
+async function fetchSpotifyArtwork(spotifyUrl: string | null): Promise<string | null> {
+  if (!spotifyUrl) return null;
+  try {
+    const resp = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(spotifyUrl)}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.thumbnail_url ?? null;
+  } catch {
+    return null;
+  }
+}
 
 async function fetchRelatedPage(pageId: string): Promise<PageObjectResponse | null> {
   try {
@@ -36,7 +52,7 @@ function mapCollaborator(page: PageObjectResponse): CollaboratorSummary {
     id: page.id,
     name,
     slug: toSlug(name),
-    roles: getMultiSelect(p['Roles']) ?? getMultiSelect(p['Role']),
+    roles: getMultiSelect(p['Role']),
     pro_affiliation: getSelect(p['PRO Affiliation']) ?? getText(p['PRO Affiliation']),
     ipi_number: getText(p['IPI Number']),
     agreement_status: getSelect(p['Agreement Status']),
@@ -94,13 +110,15 @@ export async function GET(
 
       // Fetch related entities in parallel
       const collabIds = getRelationIds(p['Collaborators']);
-      const contractIds = getRelationIds(p['Contracts & Agreements']);
-      const contactIds = getRelationIds(p['Licensing Contacts']);
+      const contractIds = getRelationIds(p['Contracts']);
+      const contactIds = getRelationIds(p['Pitched To']);
 
-      const [collabPages, contractPages, contactPages] = await Promise.all([
+      const spotifyLink = getUrl(p['Spotify Link']);
+      const [collabPages, contractPages, contactPages, artworkUrl] = await Promise.all([
         Promise.all(collabIds.map(fetchRelatedPage)),
         Promise.all(contractIds.map(fetchRelatedPage)),
         Promise.all(contactIds.map(fetchRelatedPage)),
+        fetchSpotifyArtwork(spotifyLink),
       ]);
 
       // Fetch royalties for this song's artist
@@ -186,7 +204,7 @@ export async function GET(
           pro: null,
         })),
         notes: getText(p['Notes']),
-        lyrics_status: getSelect(p['Lyrics Status']) ?? getText(p['Lyrics Status']),
+        lyrics_status: getCheckbox(p['Lyrics Written']) ? 'Written' : null,
         similar_artists: getText(p['Similar Artists']),
         usage_scenarios: getMultiSelect(p['Usage Scenarios']),
         scene_suggestions: getText(p['Scene Suggestions']),
@@ -195,23 +213,25 @@ export async function GET(
         songtrust_registered: getCheckbox(p['Songtrust Registered']),
         lyricfind_submitted: getCheckbox(p['LyricFind Submitted']),
         musixmatch_submitted: getCheckbox(p['Musixmatch Submitted']),
-        genius_submitted: getCheckbox(p['Genius Submitted']),
-        music_gateway_submitted: getCheckbox(p['Music Gateway Submitted']),
-        disco_submitted: getCheckbox(p['DISCO Submitted']),
-        songtradr_submitted: getCheckbox(p['Songtradr Submitted']),
-        discogs_submitted: getCheckbox(p['Discogs Submitted']),
-        has_instrumental: getCheckbox(p['Has Instrumental']),
-        has_acapella: getCheckbox(p['Has Acapella']),
-        has_15s_edit: getCheckbox(p['Has 15s Edit']),
-        has_30s_edit: getCheckbox(p['Has 30s Edit']),
-        has_60s_edit: getCheckbox(p['Has 60s Edit']),
-        has_360ra: getCheckbox(p['Has 360RA']),
-        has_project_file: getCheckbox(p['Has Project File']),
-        sync_status: getSelect(p['Sync Status']),
+        genius_submitted: getCheckbox(p['Genius Posted']),
+        music_gateway_submitted: getCheckbox(p['Music Gateway Uploaded']),
+        disco_submitted: getCheckbox(p['DISCO Uploaded']),
+        songtradr_submitted: getCheckbox(p['Songtradr Uploaded']),
+        discogs_submitted: getCheckbox(p['Discogs Entry']),
+        has_instrumental: getCheckbox(p['Has Instrumental Mix']),
+        has_acapella: getCheckbox(p['Acapella']),
+        has_15s_edit: getCheckbox(p['15s Edit']),
+        has_30s_edit: getCheckbox(p['30s Edit']),
+        has_60s_edit: getCheckbox(p['60s Edit']),
+        has_360ra: getCheckbox(p['360RA Mix']),
+        has_project_file: getCheckbox(p['Project File']),
+        sync_status: null,
         sync_edit_status: getSelect(p['Sync Edit Status']),
         sync_restrictions: getText(p['Sync Restrictions']),
-        disco_link: getUrl(p['DISCO Link']),
-        master_ownership: getText(p['Master Ownership']),
+        disco_link: null,
+        master_ownership: null,
+        has_stereo_master: getCheckbox(p['Stereo Master']),
+        artwork_url: artworkUrl,
 
         // Hydrated relations
         collaborators: collabPages
@@ -224,7 +244,15 @@ export async function GET(
           .filter((cp): cp is PageObjectResponse => cp !== null)
           .map(mapLicensingContact),
         royalties,
+
+        // Computed fields (set below)
+        parsed_notes: null,
+        generated_description: null,
       };
+
+      // Compute parsed notes and generated description
+      detail.parsed_notes = parseNotes(detail.notes);
+      detail.generated_description = generateTrackDescription(detail);
 
       return detail;
     });
