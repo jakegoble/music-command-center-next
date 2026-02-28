@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Enjune Music",
-  description: "Music IP Intelligence Platform",
+  title: "Music Command Center",
+  description: "Catalog & Sync — Music IP Intelligence Platform",
 };
 
 export default function RootLayout({
@@ -35,7 +35,7 @@ export default function RootLayout({
           <ArtistProvider>
             <Sidebar />
             <main className="min-h-screen pt-14 md:ml-60 md:pt-0">
-              <div className="p-6">
+              <div className="p-4 md:p-6">
                 <ArtistBadge />
                 {children}
               </div>

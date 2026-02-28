@@ -12,9 +12,9 @@ export type Artist = (typeof ARTIST_OPTIONS)[number];
 export type ArtistFilter = 'all' | Artist;
 
 export const ARTIST_COLORS: Record<Artist, string> = {
-  Jakke: '#f97316',
-  Enjune: '#8b5cf6',
-  iLÜ: '#06b6d4',
+  Jakke: '#3B82F6',
+  Enjune: '#8B5CF6',
+  iLÜ: '#22C55E',
 };
 
 /** Map lowercase URL param values to proper-cased artist names */

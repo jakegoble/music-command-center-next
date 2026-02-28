@@ -17,13 +17,13 @@ export function ArtistToggle() {
   const { artist, setArtist } = useArtistContext();
 
   return (
-    <div className="grid grid-cols-4 gap-1 rounded-full bg-gray-800/50 p-1" role="radiogroup" aria-label="Artist filter">
+    <div className="grid grid-cols-2 gap-1 rounded-xl bg-gray-800/50 p-1" role="radiogroup" aria-label="Artist filter">
       {options.map((opt) => {
         const isActive = artist === opt.value;
         const color =
           opt.value !== 'all'
             ? ARTIST_COLORS[opt.value as Artist]
-            : undefined;
+            : '#F97316';
 
         return (
           <button
@@ -31,20 +31,14 @@ export function ArtistToggle() {
             role="radio"
             aria-checked={isActive}
             onClick={() => setArtist(opt.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                setArtist(opt.value);
-              }
-            }}
-            className={`rounded-full py-2 text-xs font-medium transition-all duration-200 ease-in-out ${
+            className={`rounded-lg px-2 py-1.5 text-xs font-medium transition-all duration-200 ${
               isActive
                 ? 'text-white shadow-sm'
-                : 'text-gray-400 hover:text-gray-300'
+                : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
             }`}
             style={
               isActive
-                ? { backgroundColor: color ?? '#4b5563' }
+                ? { backgroundColor: color, color: '#fff' }
                 : undefined
             }
           >
