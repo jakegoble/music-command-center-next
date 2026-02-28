@@ -51,9 +51,9 @@ export default function RoyaltiesPage() {
   if (error) {
     return (
       <div>
-        <PageHeader title="Royalties" />
+        <PageHeader title="Revenue" />
         <div className="mt-6 rounded-lg border border-red-800 bg-red-950/50 p-4 text-red-300">
-          Failed to load royalties: {error}
+          Failed to load revenue data: {error}
         </div>
       </div>
     );
@@ -62,7 +62,7 @@ export default function RoyaltiesPage() {
   if (isLoading) {
     return (
       <div>
-        <PageHeader title="Royalties" />
+        <PageHeader title="Revenue" />
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="h-24 animate-pulse rounded-lg bg-gray-800/50" />
