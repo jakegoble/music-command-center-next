@@ -5,7 +5,19 @@ export const NOTION_DBS = {
   LICENSING_CONTACTS: '5f4f4404-502d-4e8d-bd50-6a584255a2db',
   CONTRACTS: '1e0a4aaa-04a8-4726-abdd-da08e65d5514',
   ROYALTY_TRACKING: '3e233507-12c8-4038-aaef-d29b6792abfa',
-} as const;
+  // Phase 2.4 — Create these databases in Notion, then paste IDs here.
+  // Approval Queue: properties: Entity Type (select), Entity ID (rich_text),
+  //   Entity Label (rich_text), Field Name (rich_text), Current Value (rich_text),
+  //   Proposed Value (rich_text), Source (select), Confidence (select),
+  //   Status (select: pending/approved/rejected/auto_approved/superseded),
+  //   Reason (rich_text), Reviewed At (date)
+  APPROVAL_QUEUE: process.env.NOTION_APPROVAL_QUEUE_DB ?? '',
+  // Content Pipeline: properties: Type (select), Stage (select: idea/production/
+  //   mastering/scheduled/published/promoted), Publish Date (date),
+  //   Assigned To (rich_text), Notes (rich_text), Views (number),
+  //   Likes (number), Checklist (rich_text — JSON)
+  CONTENT_PIPELINE: process.env.NOTION_CONTENT_PIPELINE_DB ?? '',
+};
 
 export const ARTIST_OPTIONS = ['Jakke', 'Enjune', 'iLÜ'] as const;
 export type Artist = (typeof ARTIST_OPTIONS)[number];
