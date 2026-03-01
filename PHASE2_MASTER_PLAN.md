@@ -405,22 +405,52 @@ This is an audit-and-fix task, not a "map 74 missing fields" task.
 
 ## PHASE 2.3 — NAVIGATION & STRUCTURE (P1)
 
-### 2.3.1 Sidebar Navigation Review
+### 2.3.1 Sidebar Artist Section Upgrade
 **Role**: A (Frontend)
+**Priority**: P0 — Jake's explicit request (2026-03-01)
 
-**Current state**: Sidebar is in `src/components/Sidebar.tsx` (NOT `src/lib/constants.ts`). The `NAV_SECTIONS` constant already has **14 links in 4 groups**:
+**Current state**: Sidebar is in `src/components/Sidebar.tsx`. The `ArtistToggle` component (`src/components/ArtistToggle.tsx`) is a basic 2x2 radio button grid. No artist profile card, no DSP icons, no stats. The prior build had a profile section but it was lost in the 4-agent wipeout.
 
-```
-MUSIC:     Dashboard, Streaming, Catalog, Albums, Revenue
-PEOPLE:    Collaborators, Licensing
-BUSINESS:  Contracts, Sync Pipeline, Content
-TOOLS:     Data Audit, AI Insights, Approvals
-```
+**Changes required**:
 
-**Review needed**:
-- Is this grouping optimal? Consider whether "Albums" deserves its own nav entry or should be a sub-route of Catalog
-- The ordering within groups — does it match user workflow priority?
-- No changes needed for "missing nav entries" — all built features are already linked
+1. **Artist Profile Card** — When a specific artist is selected (not "All"), render a profile section below the toggle:
+   - Artist profile photo (circular, ~48px)
+   - Artist name + subtitle (e.g., "Producer / Artist")
+   - Key stats: total songs (from catalog count), genre tags
+   - Store artist metadata in `src/config/notion.ts` under a new `ARTIST_PROFILES` constant
+
+2. **DSP Link Icons** — Horizontal row of SVG icons linking to each artist's platform profiles:
+   - Required DSPs: Spotify, Apple Music, YouTube Music, Amazon Music, Tidal, SoundCloud
+   - SVG icons should be inline (not emoji, not external images)
+   - Each icon links to the artist's profile URL on that platform
+   - Store URLs in `ARTIST_PROFILES` config
+   - Icons should be ~20px, monochrome gray, with hover color matching the DSP brand
+
+3. **Toggle Redesign** — Replace the 2x2 grid with a cleaner segmented control or styled dropdown:
+   - Options: All Artists, Jakke, Enjune, iLÜ
+   - Active state uses artist color (existing `ARTIST_COLORS`)
+   - Should feel modern and polished, not like radio buttons
+
+4. **Config Structure** — Add to `src/config/notion.ts`:
+   ```typescript
+   export const ARTIST_PROFILES: Record<Artist, {
+     photo: string;           // URL to profile image
+     subtitle: string;        // "Producer / Artist" etc.
+     dspLinks: {
+       spotify?: string;
+       appleMusic?: string;
+       youtubeMusic?: string;
+       amazonMusic?: string;
+       tidal?: string;
+       soundcloud?: string;
+     };
+   }> = { ... };
+   ```
+   Jake will fill in the actual URLs after the component is built. Use placeholder URLs for now.
+
+5. **Content filtering** — Already works via `ArtistContext` + `useArtistFilter` hook. No changes needed for filtering logic.
+
+**Nav grouping**: The 14-link / 4-section structure is confirmed correct. No changes needed to nav items or ordering.
 
 ### 2.3.2 Add `loading.tsx` Files to All Route Segments
 **Role**: A (Frontend)
