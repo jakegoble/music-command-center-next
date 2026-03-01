@@ -814,10 +814,34 @@ function PressTab({ song }: { song: SongDetail }) {
 
 // --- Tab: Lyrics ---
 function LyricsTab({ song }: { song: SongDetail }) {
+  const [lyrics, setLyrics] = useState<string | null>(null);
+  const [geniusUrl, setGeniusUrl] = useState<string | null>(null);
+  const [lyricsLoading, setLyricsLoading] = useState(true);
+  const [lyricsError, setLyricsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLyricsLoading(true);
+    setLyricsError(null);
+
+    fetch(`/api/lyrics/${song.slug}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        setLyrics(data.lyrics ?? null);
+        setGeniusUrl(data.genius_url ?? null);
+        if (!data.lyrics && data.error) setLyricsError(data.error);
+      })
+      .catch(err => { if (!cancelled) setLyricsError(err.message); })
+      .finally(() => { if (!cancelled) setLyricsLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [song.slug]);
+
   const lyricsProviders = [
-    { label: 'LyricFind', submitted: song.lyricfind_submitted, url: null },
-    { label: 'Musixmatch', submitted: song.musixmatch_submitted, url: null },
-    { label: 'Genius', submitted: song.genius_submitted, url: null },
+    { label: 'LyricFind', submitted: song.lyricfind_submitted },
+    { label: 'Musixmatch', submitted: song.musixmatch_submitted },
+    { label: 'Genius', submitted: song.genius_submitted },
   ];
   const submittedProviders = lyricsProviders.filter(p => p.submitted);
 
@@ -857,24 +881,97 @@ function LyricsTab({ song }: { song: SongDetail }) {
         </div>
       )}
 
-      {/* Lyrics content placeholder */}
-      <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
-        <div className="mb-4 text-4xl text-gray-700">&#127925;</div>
-        <p className="text-lg font-medium text-gray-400">
-          {song.lyrics_status === 'Written' ? 'Lyrics written but not yet added here.' : 'Lyrics not available yet.'}
-        </p>
-        <p className="mt-2 max-w-md text-sm text-gray-500">
-          Add a &quot;Lyrics&quot; text field in Notion to display full lyrics here, or connect a lyrics provider.
-        </p>
-      </div>
+      {/* Lyrics content */}
+      {lyricsLoading ? (
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5 space-y-3">
+          <div className="h-4 w-32 animate-pulse rounded bg-gray-700" />
+          <div className="h-3 w-full animate-pulse rounded bg-gray-700/50" />
+          <div className="h-3 w-5/6 animate-pulse rounded bg-gray-700/50" />
+          <div className="h-3 w-4/6 animate-pulse rounded bg-gray-700/50" />
+          <div className="h-3 w-full animate-pulse rounded bg-gray-700/50" />
+          <div className="h-3 w-3/4 animate-pulse rounded bg-gray-700/50" />
+        </div>
+      ) : lyrics ? (
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+          <div className="max-h-[500px] overflow-y-auto pr-2">
+            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-200">
+              {lyrics}
+            </pre>
+          </div>
+          {geniusUrl && (
+            <div className="mt-4 border-t border-gray-700/30 pt-3 flex items-center gap-2">
+              <a
+                href={geniusUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 px-3 py-1.5 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition-colors"
+              >
+                Sourced from Genius &rarr;
+              </a>
+              <span className="text-[10px] text-gray-600">For personal/dashboard use only</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
+          <div className="mb-4 text-4xl text-gray-700">&#127925;</div>
+          <p className="text-lg font-medium text-gray-400">
+            {lyricsError === 'GENIUS_ACCESS_TOKEN not configured. Add it to your environment variables.'
+              ? 'Genius API not configured'
+              : song.lyrics_status === 'Written'
+                ? 'Lyrics written but not found on Genius.'
+                : 'Lyrics not available yet.'}
+          </p>
+          <p className="mt-2 max-w-md text-sm text-gray-500">
+            {lyricsError === 'GENIUS_ACCESS_TOKEN not configured. Add it to your environment variables.'
+              ? 'Add GENIUS_ACCESS_TOKEN to your environment variables to enable lyrics lookup.'
+              : 'Connect a lyrics provider or add lyrics manually in Notion.'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
 
 // --- Tab: Video ---
+interface DiscoveredVideo {
+  id: string;
+  title: string;
+  channel: string;
+  thumbnail: string;
+  publishedAt: string;
+}
+
 function VideoTab({ song }: { song: SongDetail }) {
   const hasYouTube = !!song.youtube_link;
   const youtubeId = hasYouTube ? extractYouTubeId(song.youtube_link!) : null;
+  const [discoveredVideos, setDiscoveredVideos] = useState<DiscoveredVideo[]>([]);
+  const [videosLoading, setVideosLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setVideosLoading(true);
+
+    fetch(`/api/videos/${song.slug}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        const videos = (data.videos ?? []) as DiscoveredVideo[];
+        // Filter out the official video if it's in the discovered list
+        const filtered = youtubeId ? videos.filter(v => v.id !== youtubeId) : videos;
+        setDiscoveredVideos(filtered);
+      })
+      .catch(() => { if (!cancelled) setDiscoveredVideos([]); })
+      .finally(() => { if (!cancelled) setVideosLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [song.slug, youtubeId]);
+
+  const formatVideoDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch { return ''; }
+  };
 
   return (
     <div className="space-y-6">
@@ -906,33 +1003,58 @@ function VideoTab({ song }: { song: SongDetail }) {
         </div>
       )}
 
-      {/* More Videos — UGC / Trending placeholder */}
+      {/* Discovered Videos */}
       <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">More Videos</h3>
-          <div className="flex gap-1">
-            {['YouTube', 'Instagram', 'TikTok'].map(p => (
-              <span key={p} className="rounded bg-gray-700/50 px-2 py-0.5 text-[10px] text-gray-500">{p}</span>
-            ))}
-          </div>
-        </div>
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">More Videos</h3>
 
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700/50 py-10 text-center">
-          <div className="mb-3 text-3xl text-gray-700">&#127909;</div>
-          <p className="text-sm font-medium text-gray-400">No additional video content linked yet.</p>
-          <p className="mt-1.5 max-w-md text-xs text-gray-500">
-            Instagram Reels, TikTok clips, and YouTube Shorts using this track will appear here when video URLs are added in Notion.
-          </p>
-          {/* Placeholder grid */}
-          <div className="mt-5 grid w-full max-w-lg grid-cols-3 gap-3 opacity-20">
-            {['Instagram Reel', 'TikTok', 'YouTube Short'].map(label => (
-              <div key={label} className="rounded-lg border border-gray-700 bg-gray-800/50 p-3">
-                <div className="mb-2 aspect-[9/16] rounded bg-gray-700" />
-                <p className="text-[10px] text-gray-500">{label}</p>
+        {videosLoading ? (
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-gray-700/50 bg-gray-900/50 p-3">
+                <div className="aspect-video animate-pulse rounded-lg bg-gray-700" />
+                <div className="mt-2 h-3 w-3/4 animate-pulse rounded bg-gray-700" />
+                <div className="mt-1 h-2 w-1/2 animate-pulse rounded bg-gray-700/50" />
               </div>
             ))}
           </div>
-        </div>
+        ) : discoveredVideos.length > 0 ? (
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+            {discoveredVideos.map(video => (
+              <a
+                key={video.id}
+                href={`https://www.youtube.com/watch?v=${video.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group rounded-xl border border-gray-700/50 bg-gray-900/50 p-3 transition-colors hover:border-gray-600"
+              >
+                <div className="relative aspect-video overflow-hidden rounded-lg bg-gray-800">
+                  {video.thumbnail && (
+                    <img src={video.thumbnail} alt={video.title} className="h-full w-full object-cover" />
+                  )}
+                  {/* Play overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg className="h-10 w-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="mt-2 text-sm font-medium text-white line-clamp-2 group-hover:text-orange-400">{video.title}</p>
+                <p className="mt-0.5 text-xs text-gray-400">{video.channel}</p>
+                {video.publishedAt && (
+                  <p className="mt-0.5 text-xs text-gray-500">{formatVideoDate(video.publishedAt)}</p>
+                )}
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700/50 py-10 text-center">
+            <div className="mb-3 text-3xl text-gray-700">&#127909;</div>
+            <p className="text-sm font-medium text-gray-400">No additional video content found.</p>
+            <p className="mt-1.5 max-w-md text-xs text-gray-500">
+              Videos will appear here when a YouTube API key is configured, or when video URLs are added in Notion.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
