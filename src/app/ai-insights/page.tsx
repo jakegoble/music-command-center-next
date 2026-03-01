@@ -3,8 +3,11 @@
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { useArtistContext } from '@/lib/contexts/ArtistContext';
-import { artistToParam } from '@/config/notion';
+import { artistToParam, ARTIST_OPTIONS } from '@/config/notion';
 import type { CatalogStats } from '@/lib/types';
+import { useIntakeData } from '@/lib/hooks/useIntakeData';
+import { INTAKE_CATEGORIES, INTAKE_QUESTIONS, getQuestionsByCategory, getCategoryQuestionCount, type IntakeQuestion } from '@/lib/data/intake-questions';
+import { getAdjustedWeights, getAdjustedBenchmarks, generateIntakeInsights, type StrategyWeights, type BenchmarkOverrides } from '@/lib/utils/intake-scoring';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -52,22 +55,29 @@ interface StrategyScores {
   composite: number;
 }
 
-function computeStrategyScores(stats: CatalogStats): StrategyScores {
-  // Streaming (30%): uses catalog data + known platform data
+function computeStrategyScores(
+  stats: CatalogStats,
+  weights?: StrategyWeights,
+  benchmarks?: BenchmarkOverrides,
+): StrategyScores {
+  const w = weights ?? { streaming: 0.30, social: 0.25, collaborations: 0.20, funnel: 0.15, catalog: 0.10 };
+  const b = benchmarks ?? { monthlyListenerBenchmark: 50_000, totalSongsBenchmark: 75, syncReadinessBenchmark: 50 };
+
+  // Streaming: uses catalog data + known platform data
   const monthlyListeners = 15200;
   const playlistReach = 1_720_000;
   const currentPlaylists = 75;
   const avgPopularity = stats.total_songs > 0
-    ? Math.round(Object.values(stats.genre_distribution).reduce((a, b) => a + b, 0) / stats.total_songs * 33)
+    ? Math.round(Object.values(stats.genre_distribution).reduce((a, b2) => a + b2, 0) / stats.total_songs * 33)
     : 33;
   const streaming = (
-    0.30 * norm(monthlyListeners, 50_000) +
+    0.30 * norm(monthlyListeners, b.monthlyListenerBenchmark) +
     0.25 * norm(playlistReach, 2_000_000) +
     0.25 * norm(currentPlaylists, 75) +
     0.20 * norm(avgPopularity, 33)
   );
 
-  // Social (25%): from last IG audit
+  // Social: from last IG audit
   const engagementRate = 0.021;
   const reelPerformance = 80;
   const reachPct = 0.15;
@@ -79,7 +89,7 @@ function computeStrategyScores(stats: CatalogStats): StrategyScores {
     0.20 * yoyTrend
   );
 
-  // Collaborations (20%)
+  // Collaborations
   const collabMultiplier = 2.2;
   const musicCollabQuality = 95;
   const collabRate = 0.15;
@@ -91,7 +101,7 @@ function computeStrategyScores(stats: CatalogStats): StrategyScores {
     0.15 * norm(ontoutUtil, 12)
   );
 
-  // Funnel (15%)
+  // Funnel
   const linkCtr = 0.005;
   const profileVisitRate = 0.02;
   const funnel = (
@@ -99,22 +109,22 @@ function computeStrategyScores(stats: CatalogStats): StrategyScores {
     0.30 * norm(profileVisitRate, 0.08)
   );
 
-  // Catalog (10%): uses live data
+  // Catalog: uses live data
   const totalSongs = stats.total_songs;
   const genreCount = Object.keys(stats.genre_distribution).length;
   const avgStreams = totalSongs > 0 ? stats.total_streams / totalSongs : 0;
   const catalog = (
-    0.40 * norm(totalSongs, 75) +
+    0.40 * norm(totalSongs, b.totalSongsBenchmark) +
     0.30 * norm(genreCount, 10) +
     0.30 * norm(avgStreams, 200_000)
   );
 
   const composite = Math.round(
-    streaming * 0.30 +
-    social * 0.25 +
-    collaborations * 0.20 +
-    funnel * 0.15 +
-    catalog * 0.10
+    streaming * w.streaming +
+    social * w.social +
+    collaborations * w.collaborations +
+    funnel * w.funnel +
+    catalog * w.catalog
   );
 
   return {
@@ -140,9 +150,11 @@ interface CatalogScores {
   composite: number;
 }
 
-function computeCatalogScores(stats: CatalogStats): CatalogScores {
+function computeCatalogScores(stats: CatalogStats, benchmarks?: BenchmarkOverrides): CatalogScores {
+  const b = benchmarks ?? { monthlyListenerBenchmark: 50_000, totalSongsBenchmark: 75, syncReadinessBenchmark: 50 };
+
   const releasedPct = stats.total_songs > 0 ? stats.released / stats.total_songs : 0;
-  const size = (0.50 * norm(stats.total_songs, 75) + 0.50 * norm(releasedPct * 100, 80));
+  const size = (0.50 * norm(stats.total_songs, b.totalSongsBenchmark) + 0.50 * norm(releasedPct * 100, 80));
 
   const avgStreams = stats.total_songs > 0 ? stats.total_streams / stats.total_songs : 0;
   const streaming = (0.50 * norm(stats.total_streams, 5_000_000) + 0.50 * norm(avgStreams, 200_000));
@@ -155,7 +167,7 @@ function computeCatalogScores(stats: CatalogStats): CatalogScores {
   const syncPct = stats.total_songs > 0 ? stats.sync_ready / stats.total_songs : 0;
   const stemPct = stats.total_songs > 0 ? stats.has_stems / stats.total_songs : 0;
   const atmosPct = stats.total_songs > 0 ? stats.has_atmos / stats.total_songs : 0;
-  const sync_readiness = (0.40 * norm(syncPct * 100, 50) + 0.35 * norm(stemPct * 100, 50) + 0.25 * norm(atmosPct * 100, 30));
+  const sync_readiness = (0.40 * norm(syncPct * 100, b.syncReadinessBenchmark) + 0.35 * norm(stemPct * 100, 50) + 0.25 * norm(atmosPct * 100, 30));
 
   const albumCount = stats.total_albums;
   const production = (
@@ -458,7 +470,7 @@ const DATA_SOURCES: DataSource[] = [
 // Tab config
 // ---------------------------------------------------------------------------
 
-const TABS = ['Overview', 'Strategy', 'Catalog', 'Actions'] as const;
+const TABS = ['Overview', 'Strategy', 'Catalog', 'Actions', 'Artist DNA'] as const;
 type TabKey = (typeof TABS)[number];
 
 // ---------------------------------------------------------------------------
@@ -466,11 +478,21 @@ type TabKey = (typeof TABS)[number];
 // ---------------------------------------------------------------------------
 
 export default function AIInsightsPage() {
-  const { artist } = useArtistContext();
+  const { artist, setArtist } = useArtistContext();
   const [stats, setStats] = useState<CatalogStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('Overview');
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
+
+  // Intake data hook — per artist
+  const intakeArtistName = artist !== 'all' ? artist : '';
+  const { answers: intakeAnswers, saveAnswer, completionPct, answeredCount, totalQuestions, lastUpdated, mounted: intakeMounted, clearAll: clearIntake } = useIntakeData(intakeArtistName);
+
+  // Compute adjusted weights/benchmarks from intake data
+  const hasIntakeData = Object.keys(intakeAnswers).length > 0;
+  const adjustedWeights = hasIntakeData ? getAdjustedWeights(intakeAnswers) : undefined;
+  const adjustedBenchmarks = hasIntakeData ? getAdjustedBenchmarks(intakeAnswers) : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -507,15 +529,16 @@ export default function AIInsightsPage() {
     );
   }
 
-  const strategyScores = computeStrategyScores(stats);
-  const catalogScores = computeCatalogScores(stats);
+  const strategyScores = computeStrategyScores(stats, adjustedWeights, adjustedBenchmarks);
+  const catalogScores = computeCatalogScores(stats, adjustedBenchmarks);
 
+  const wt = adjustedWeights ?? { streaming: 0.30, social: 0.25, collaborations: 0.20, funnel: 0.15, catalog: 0.10 };
   const strategyCats = [
-    { icon: '\uD83C\uDFB5', name: 'Streaming', score: strategyScores.streaming, weight: '30%' },
-    { icon: '\uD83D\uDCF1', name: 'Social', score: strategyScores.social, weight: '25%' },
-    { icon: '\uD83E\uDD1D', name: 'Collaborations', score: strategyScores.collaborations, weight: '20%' },
-    { icon: '\uD83D\uDD17', name: 'Funnel', score: strategyScores.funnel, weight: '15%' },
-    { icon: '\uD83D\uDCBF', name: 'Catalog', score: strategyScores.catalog, weight: '10%' },
+    { icon: '\uD83C\uDFB5', name: 'Streaming', score: strategyScores.streaming, weight: `${Math.round(wt.streaming * 100)}%` },
+    { icon: '\uD83D\uDCF1', name: 'Social', score: strategyScores.social, weight: `${Math.round(wt.social * 100)}%` },
+    { icon: '\uD83E\uDD1D', name: 'Collaborations', score: strategyScores.collaborations, weight: `${Math.round(wt.collaborations * 100)}%` },
+    { icon: '\uD83D\uDD17', name: 'Funnel', score: strategyScores.funnel, weight: `${Math.round(wt.funnel * 100)}%` },
+    { icon: '\uD83D\uDCBF', name: 'Catalog', score: strategyScores.catalog, weight: `${Math.round(wt.catalog * 100)}%` },
   ];
 
   const catalogCats = [
@@ -539,6 +562,7 @@ export default function AIInsightsPage() {
   const workingInsights = generateWorkingInsights(stats);
   const opportunityInsights = generateOpportunityInsights(stats);
   const riskInsights = generateRiskInsights(stats);
+  const intakeInsights = hasIntakeData ? generateIntakeInsights(intakeAnswers, stats) : [];
 
   const topGenres = Object.entries(stats.genre_distribution).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topMoods = Object.entries(stats.mood_distribution).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -726,9 +750,17 @@ export default function AIInsightsPage() {
 
         {activeTab === 'Strategy' && (
           <div className="space-y-4">
+            {intakeInsights.length > 0 && (
+              <InsightSection title="From Artist DNA" color="#8B5CF6" cards={intakeInsights} />
+            )}
             <InsightSection title="What's Working" color="#1DB954" cards={STRATEGIC_WORKING} />
             <InsightSection title="Opportunities" color="#FFC107" cards={STRATEGIC_OPPORTUNITIES} />
             <InsightSection title="Risks" color="#F44336" cards={STRATEGIC_RISKS} />
+            {!hasIntakeData && artist !== 'all' && (
+              <div className="rounded-lg border border-dashed border-gray-700 p-4 text-center">
+                <p className="text-sm text-gray-400">Fill out the <button onClick={() => setActiveTab('Artist DNA')} className="font-medium text-purple-400 hover:text-purple-300 underline">Artist DNA</button> questionnaire to unlock personalized insights based on this artist&apos;s goals and direction.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -881,6 +913,136 @@ export default function AIInsightsPage() {
             </div>
           </div>
         )}
+
+        {activeTab === 'Artist DNA' && (
+          <div className="space-y-6">
+            {artist === 'all' ? (
+              /* Prompt to select an artist */
+              <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-8 text-center">
+                <p className="text-3xl mb-3">🧬</p>
+                <h3 className="text-lg font-bold text-white">Select an Artist to Build Their Profile</h3>
+                <p className="mt-2 text-sm text-gray-400">Artist DNA questions are answered per artist. Choose one to get started.</p>
+                <div className="mt-6 flex justify-center gap-3">
+                  {ARTIST_OPTIONS.map(name => (
+                    <button
+                      key={name}
+                      onClick={() => setArtist(name)}
+                      className="rounded-lg border border-gray-700 bg-gray-800 px-5 py-3 text-sm font-medium text-white transition-colors hover:border-purple-500 hover:bg-purple-900/20"
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Progress Section */}
+                <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+                  <div className="flex items-center gap-5">
+                    {/* Progress Ring */}
+                    <div className="relative shrink-0">
+                      <svg width="80" height="80" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="34" fill="none" stroke="#374151" strokeWidth="6" />
+                        <circle
+                          cx="40" cy="40" r="34" fill="none"
+                          stroke="#8B5CF6" strokeWidth="6"
+                          strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 34}`}
+                          strokeDashoffset={`${2 * Math.PI * 34 * (1 - completionPct / 100)}`}
+                          transform="rotate(-90 40 40)"
+                          className="transition-all duration-500"
+                        />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">
+                        {intakeMounted ? `${completionPct}%` : '—'}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-bold text-white">Artist DNA: {artist}</h3>
+                      <p className="mt-1 text-sm text-gray-400">
+                        Help the system learn about {artist}. Your answers shape scoring weights, surface relevant opportunities, and flag risks.
+                      </p>
+                      <p className="mt-2 text-xs text-gray-500">
+                        {intakeMounted ? `${answeredCount} of ${totalQuestions} questions answered` : 'Loading...'}
+                        {lastUpdated && ` · Last updated ${new Date(lastUpdated).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                  </div>
+                  {hasIntakeData && (
+                    <div className="mt-3 rounded-lg bg-purple-900/20 border border-purple-800/30 px-3 py-2 text-xs text-purple-300">
+                      Scoring weights are personalized based on your answers. Strategy and Catalog scores reflect this artist&apos;s priorities.
+                    </div>
+                  )}
+                </div>
+
+                {/* Category Accordions */}
+                {INTAKE_CATEGORIES.map(cat => {
+                  const isOpen = openCategories.has(cat.id);
+                  const questions = getQuestionsByCategory(cat.id);
+                  const catAnswered = questions.filter(q => intakeAnswers[q.id]).length;
+                  const catTotal = getCategoryQuestionCount(cat.id);
+
+                  return (
+                    <div key={cat.id} className="rounded-xl border border-gray-700/50 bg-gray-800/50 overflow-hidden">
+                      <button
+                        onClick={() => setOpenCategories(prev => {
+                          const next = new Set(prev);
+                          if (next.has(cat.id)) next.delete(cat.id);
+                          else next.add(cat.id);
+                          return next;
+                        })}
+                        className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-gray-700/30"
+                      >
+                        <span className="text-xl">{cat.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white">{cat.label}</p>
+                          <p className="text-xs text-gray-500">{cat.description}</p>
+                        </div>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          catAnswered === catTotal
+                            ? 'bg-green-900/40 text-green-400'
+                            : catAnswered > 0
+                              ? 'bg-purple-900/40 text-purple-400'
+                              : 'bg-gray-700/50 text-gray-500'
+                        }`}>
+                          {catAnswered}/{catTotal}
+                        </span>
+                        <svg className={`h-4 w-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {isOpen && (
+                        <div className="border-t border-gray-700/50 px-5 py-4 space-y-4">
+                          {questions.map(q => (
+                            <IntakeQuestionCard
+                              key={q.id}
+                              question={q}
+                              value={intakeAnswers[q.id]?.value}
+                              onAnswer={(val) => saveAnswer(q.id, val)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Clear All */}
+                {hasIntakeData && (
+                  <div className="text-center">
+                    <button
+                      onClick={() => { if (confirm(`Clear all intake answers for ${artist}?`)) clearIntake(); }}
+                      className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                    >
+                      Clear all answers for {artist}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Data Sources (always visible) */}
@@ -949,6 +1111,121 @@ function ScoreBreakdown({ title, categories }: { title: string; categories: { ic
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Intake Question Card
+// ---------------------------------------------------------------------------
+
+function IntakeQuestionCard({ question, value, onAnswer }: {
+  question: IntakeQuestion;
+  value: string | string[] | number | undefined;
+  onAnswer: (val: string | string[] | number) => void;
+}) {
+  const isAnswered = value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0);
+
+  return (
+    <div className={`rounded-lg border p-4 transition-colors ${
+      isAnswered ? 'border-purple-800/40 bg-purple-900/10' : 'border-gray-700/50 bg-gray-900/30'
+    }`}>
+      <div className="flex items-start justify-between gap-2">
+        <label className="text-sm font-medium text-white">{question.label}</label>
+        {isAnswered && (
+          <svg className="h-4 w-4 shrink-0 text-purple-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+      </div>
+      {question.helpText && (
+        <p className="mt-1 text-xs text-gray-500">{question.helpText}</p>
+      )}
+      <div className="mt-3">
+        {question.type === 'single-select' && question.options && (
+          <div className="flex flex-wrap gap-2">
+            {question.options.map(opt => (
+              <button
+                key={opt}
+                onClick={() => onAnswer(opt)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                  value === opt
+                    ? 'border-purple-500 bg-purple-900/30 text-purple-300'
+                    : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600 hover:text-gray-300'
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {question.type === 'multi-select' && question.options && (
+          <div className="flex flex-wrap gap-2">
+            {question.options.map(opt => {
+              const selected = Array.isArray(value) && value.includes(opt);
+              return (
+                <button
+                  key={opt}
+                  onClick={() => {
+                    const current = Array.isArray(value) ? value : [];
+                    const next = selected ? current.filter(v => v !== opt) : [...current, opt];
+                    onAnswer(next);
+                  }}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                    selected
+                      ? 'border-purple-500 bg-purple-900/30 text-purple-300'
+                      : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600 hover:text-gray-300'
+                  }`}
+                >
+                  {selected && <span className="mr-1">&#10003;</span>}
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {question.type === 'scale' && (
+          <div>
+            <div className="flex items-center gap-2">
+              {Array.from({ length: (question.scaleMax ?? 5) - (question.scaleMin ?? 1) + 1 }, (_, i) => {
+                const scaleVal = (question.scaleMin ?? 1) + i;
+                const isSelected = value === scaleVal;
+                return (
+                  <button
+                    key={scaleVal}
+                    onClick={() => onAnswer(scaleVal)}
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold transition-all ${
+                      isSelected
+                        ? 'border-purple-500 bg-purple-600 text-white'
+                        : 'border-gray-700 bg-gray-800 text-gray-500 hover:border-gray-600 hover:text-gray-300'
+                    }`}
+                  >
+                    {scaleVal}
+                  </button>
+                );
+              })}
+            </div>
+            {question.scaleLabels && (
+              <div className="mt-1.5 flex justify-between text-[10px] text-gray-500">
+                <span>{question.scaleLabels[0]}</span>
+                <span>{question.scaleLabels[1]}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {question.type === 'text' && (
+          <textarea
+            value={typeof value === 'string' ? value : ''}
+            onChange={(e) => onAnswer(e.target.value)}
+            placeholder={question.placeholder}
+            rows={2}
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500/30 resize-none"
+          />
+        )}
       </div>
     </div>
   );
