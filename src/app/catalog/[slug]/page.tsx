@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
 import { useArtistContext } from '@/lib/contexts/ArtistContext';
 import { artistToParam, ARTIST_COLORS, type Artist } from '@/config/notion';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import type { SongDetail } from '@/lib/types';
 import { PRESS_COVERAGE, type PressCoverage } from '@/lib/data/press-coverage';
 
@@ -547,17 +548,21 @@ function RevenueTab({ song }: { song: SongDetail }) {
       {sourceEntries.length > 0 && (
         <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Revenue by Source</h3>
-          <div className="space-y-2">
-            {sourceEntries.map(([source, amount]) => (
-              <div key={source} className="flex items-center gap-3">
-                <span className="w-28 shrink-0 text-sm text-gray-300">{source}</span>
-                <div className="flex-1">
-                  <div className="h-5 rounded bg-green-600/60" style={{ width: `${(amount / maxSource) * 100}%` }} />
-                </div>
-                <span className="w-20 text-right text-sm text-gray-400">{formatCurrency(amount)}</span>
-              </div>
-            ))}
-          </div>
+          <ResponsiveContainer width="100%" height={Math.max(180, sourceEntries.length * 36)}>
+            <BarChart data={sourceEntries.map(([source, amount]) => ({ source, amount }))} layout="vertical" margin={{ top: 5, right: 10, bottom: 5, left: 5 }}>
+              <XAxis type="number" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}K` : v}`} />
+              <YAxis type="category" dataKey="source" tick={{ fill: '#D1D5DB', fontSize: 12 }} axisLine={false} tickLine={false} width={100} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                formatter={(value: number | undefined) => [formatCurrency(value ?? 0), 'Revenue']}
+              />
+              <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                {sourceEntries.map(([, ], i) => (
+                  <Cell key={i} fill={['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1'][i % 7]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
     </div>

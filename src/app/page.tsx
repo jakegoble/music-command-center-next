@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { PageHeader } from '@/components/PageHeader';
 import { useArtistContext } from '@/lib/contexts/ArtistContext';
 import { artistToParam, ARTIST_COLORS, type Artist } from '@/config/notion';
@@ -331,40 +332,36 @@ export default function Dashboard() {
           {yearEntries.length === 0 ? (
             <p className="py-4 text-center text-sm text-gray-500">No year data available.</p>
           ) : (
-            <div className="flex items-end gap-2" style={{ height: 180 }}>
-              {yearEntries.map(([year, count]) => {
-                const maxYear = Math.max(...yearEntries.map(([, v]) => v));
-                const barH = maxYear > 0 ? (count / maxYear) * 150 : 0;
-                return (
-                  <div key={year} className="flex flex-1 flex-col items-center gap-1">
-                    <span className="text-xs text-gray-400">{count}</span>
-                    <div className="w-full rounded-t bg-indigo-500/70" style={{ height: barH }} />
-                    <span className="text-[10px] text-gray-500">{year}</span>
-                  </div>
-                );
-              })}
-            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={yearEntries.map(([year, count]) => ({ year, count }))} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                <XAxis dataKey="year" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} width={25} />
+                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#D1D5DB' }} />
+                <Bar dataKey="count" fill="#6366F1" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
 
-      {/* Revenue Charts */}
+      {/* Revenue Charts — Recharts */}
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         {/* Revenue by Quarter */}
         {quarterEntries.length > 0 && (
           <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Revenue by Quarter</h2>
-            <div className="space-y-2">
-              {quarterEntries.map(([quarter, amount]) => (
-                <div key={quarter} className="flex items-center gap-3">
-                  <span className="w-20 shrink-0 text-sm text-gray-300">{quarter}</span>
-                  <div className="flex-1">
-                    <div className="h-5 rounded bg-emerald-600/60" style={{ width: `${(amount / maxQuarter) * 100}%` }} />
-                  </div>
-                  <span className="w-20 text-right text-sm text-gray-400">{formatCurrency(amount)}</span>
-                </div>
-              ))}
-            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={quarterEntries.map(([quarter, amount]) => ({ quarter, amount }))} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                <XAxis dataKey="quarter" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}K`} width={50} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                  labelStyle={{ color: '#D1D5DB' }}
+                  formatter={(value: number | undefined) => [formatCurrency(value ?? 0), 'Revenue']}
+                />
+                <Bar dataKey="amount" fill="#10B981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         )}
 
@@ -372,16 +369,37 @@ export default function Dashboard() {
         {sourceEntries.length > 0 && (
           <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Revenue by Source</h2>
-            <div className="space-y-2">
-              {sourceEntries.map(([source, amount]) => (
-                <div key={source} className="flex items-center gap-3">
-                  <span className="w-36 shrink-0 truncate text-sm text-gray-300">{source}</span>
-                  <div className="flex-1">
-                    <div className="h-5 rounded bg-blue-600/60" style={{ width: `${(amount / maxSource) * 100}%` }} />
+            <div className="flex items-center gap-6">
+              <ResponsiveContainer width="50%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={sourceEntries.map(([name, value]) => ({ name, value }))}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {sourceEntries.map(([, ], i) => (
+                      <Cell key={i} fill={GENRE_COLORS[i % GENRE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                    formatter={(value: number | undefined) => [formatCurrency(value ?? 0), 'Revenue']}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex-1 space-y-1.5">
+                {sourceEntries.map(([source, amount], i) => (
+                  <div key={source} className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: GENRE_COLORS[i % GENRE_COLORS.length] }} />
+                    <span className="flex-1 truncate text-xs text-gray-300">{source}</span>
+                    <span className="text-xs text-gray-400">{formatCurrency(amount)}</span>
                   </div>
-                  <span className="w-20 text-right text-sm text-gray-400">{formatCurrency(amount)}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
