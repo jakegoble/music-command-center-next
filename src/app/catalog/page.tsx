@@ -490,82 +490,111 @@ export default function CatalogPage() {
             <span className="text-sm text-gray-400">{total} song{total !== 1 ? 's' : ''}</span>
           </div>
 
+          {/* Active filter chips (visible when panel collapsed) */}
+          {!filtersOpen && activeFilterCount > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {statusFilter && <span className="rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2.5 py-0.5 text-xs font-medium">{statusFilter}</span>}
+              {genreFilter && <span className="rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2.5 py-0.5 text-xs font-medium">{genreFilter}</span>}
+              {moodFilter && <span className="rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2.5 py-0.5 text-xs font-medium">{moodFilter}</span>}
+              {keyFilter && <span className="rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2.5 py-0.5 text-xs font-medium">Key: {keyFilter}</span>}
+              {distributorFilter && <span className="rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2.5 py-0.5 text-xs font-medium">{distributorFilter}</span>}
+              {albumFilter && <span className="rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2.5 py-0.5 text-xs font-medium">{albumFilter}</span>}
+              {syncAvailable && <span className="rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2.5 py-0.5 text-xs font-medium">Sync: {syncAvailable === 'true' ? 'Yes' : 'No'}</span>}
+              {atmosFilter && <span className="rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2.5 py-0.5 text-xs font-medium">Atmos: {atmosFilter === 'true' ? 'Yes' : 'No'}</span>}
+              {hasStemsFilter && <span className="rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2.5 py-0.5 text-xs font-medium">Stems: {hasStemsFilter === 'true' ? 'Yes' : 'No'}</span>}
+              <button onClick={clearAllFilters} className="rounded-full bg-gray-700/50 px-2.5 py-0.5 text-xs text-gray-400 hover:text-white">Clear all</button>
+            </div>
+          )}
+
           {/* Collapsible filter panel */}
           {filtersOpen && (
-            <div className="mt-3 rounded-xl border border-gray-700/50 bg-gray-800/50 p-4">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {/* Sound section */}
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">Genre</label>
-                  <select value={genreFilter} onChange={e => setGenreFilter(e.target.value)} className={selectClasses}>
-                    <option value="">All Genres</option>
-                    {filterOptions?.genres.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">Mood</label>
-                  <select value={moodFilter} onChange={e => setMoodFilter(e.target.value)} className={selectClasses}>
-                    <option value="">All Moods</option>
-                    {filterOptions?.moods.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">Key</label>
-                  <select value={keyFilter} onChange={e => setKeyFilter(e.target.value)} className={selectClasses}>
-                    <option value="">All Keys</option>
-                    {filterOptions?.keys.map(k => <option key={k} value={k}>{k}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">BPM Range</label>
-                  <div className="flex items-center gap-1.5">
-                    <input type="number" placeholder="Min" value={bpmMin} onChange={e => setBpmMin(e.target.value)} className={inputClasses} />
-                    <span className="text-gray-600">&ndash;</span>
-                    <input type="number" placeholder="Max" value={bpmMax} onChange={e => setBpmMax(e.target.value)} className={inputClasses} />
+            <div className="mt-3 rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 space-y-5">
+              {/* Sound Profile */}
+              <div>
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-gray-500">Sound Profile</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Genre</label>
+                    <select value={genreFilter} onChange={e => setGenreFilter(e.target.value)} className={selectClasses}>
+                      <option value="">All Genres</option>
+                      {filterOptions?.genres.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Mood</label>
+                    <select value={moodFilter} onChange={e => setMoodFilter(e.target.value)} className={selectClasses}>
+                      <option value="">All Moods</option>
+                      {filterOptions?.moods.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Key</label>
+                    <select value={keyFilter} onChange={e => setKeyFilter(e.target.value)} className={selectClasses}>
+                      <option value="">All Keys</option>
+                      {filterOptions?.keys.map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">BPM Range</label>
+                    <div className="flex items-center gap-1.5">
+                      <input type="number" placeholder="Min" value={bpmMin} onChange={e => setBpmMin(e.target.value)} className={inputClasses} />
+                      <span className="text-gray-600">&ndash;</span>
+                      <input type="number" placeholder="Max" value={bpmMax} onChange={e => setBpmMax(e.target.value)} className={inputClasses} />
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Distribution section */}
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">Status</label>
-                  <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={selectClasses}>
-                    <option value="">All Status</option>
-                    <option value="Released">Released</option>
-                    <option value="Unreleased">Unreleased</option>
-                    <option value="In Progress">In Progress</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">Distributor</label>
-                  <select value={distributorFilter} onChange={e => setDistributorFilter(e.target.value)} className={selectClasses}>
-                    <option value="">All Distributors</option>
-                    {filterOptions?.distributors.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">Album/EP</label>
-                  <select value={albumFilter} onChange={e => setAlbumFilter(e.target.value)} className={selectClasses}>
-                    <option value="">All Albums</option>
-                    {filterOptions?.albums.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">Year Range</label>
-                  <div className="flex items-center gap-1.5">
-                    <input type="number" placeholder="From" value={yearMin} onChange={e => setYearMin(e.target.value)} className={inputClasses} />
-                    <span className="text-gray-600">&ndash;</span>
-                    <input type="number" placeholder="To" value={yearMax} onChange={e => setYearMax(e.target.value)} className={inputClasses} />
+              {/* Status & Distribution */}
+              <div>
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-gray-500">Status & Distribution</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Status</label>
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={selectClasses}>
+                      <option value="">All Status</option>
+                      <option value="Released">Released</option>
+                      <option value="Unreleased">Unreleased</option>
+                      <option value="In Progress">In Progress</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Distributor</label>
+                    <select value={distributorFilter} onChange={e => setDistributorFilter(e.target.value)} className={selectClasses}>
+                      <option value="">All Distributors</option>
+                      {filterOptions?.distributors.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Album/EP</label>
+                    <select value={albumFilter} onChange={e => setAlbumFilter(e.target.value)} className={selectClasses}>
+                      <option value="">All Albums</option>
+                      {filterOptions?.albums.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Year Range</label>
+                    <div className="flex items-center gap-1.5">
+                      <input type="number" placeholder="From" value={yearMin} onChange={e => setYearMin(e.target.value)} className={inputClasses} />
+                      <span className="text-gray-600">&ndash;</span>
+                      <input type="number" placeholder="To" value={yearMax} onChange={e => setYearMax(e.target.value)} className={inputClasses} />
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Sync & Production toggles */}
-                <TriToggle label="Sync Available" value={syncAvailable} onChange={setSyncAvailable} />
-                <TriToggle label="Atmos Mix" value={atmosFilter} onChange={setAtmosFilter} />
-                <TriToggle label="Stems" value={hasStemsFilter} onChange={setHasStemsFilter} />
+              {/* Sync & Deliverables */}
+              <div>
+                <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-gray-500">Sync & Deliverables</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <TriToggle label="Sync Available" value={syncAvailable} onChange={setSyncAvailable} />
+                  <TriToggle label="Atmos Mix" value={atmosFilter} onChange={setAtmosFilter} />
+                  <TriToggle label="Stems" value={hasStemsFilter} onChange={setHasStemsFilter} />
+                </div>
               </div>
 
               {activeFilterCount > 0 && (
-                <div className="mt-3 border-t border-gray-700/50 pt-3">
+                <div className="border-t border-gray-700/50 pt-3">
                   <button onClick={clearAllFilters} className="text-xs text-orange-400 hover:text-orange-300">
                     Clear all filters ({activeFilterCount})
                   </button>
