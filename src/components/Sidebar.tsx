@@ -14,7 +14,7 @@ const NAV_SECTIONS = [
       { href: '/', label: 'Dashboard' },
       { href: '/streaming', label: 'Streaming' },
       { href: '/catalog', label: 'Catalog' },
-      { href: '/catalog/albums', label: 'Albums' },
+      { href: '/catalog/albums', label: 'Albums', indent: true },
       { href: '/royalties', label: 'Revenue' },
     ],
   },
@@ -135,7 +135,9 @@ export function Sidebar() {
                     key={link.href}
                     href={buildHref(link.href)}
                     onClick={() => setOpen(false)}
-                    className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                    className={`block rounded-lg py-2 text-sm font-medium transition-colors duration-150 ${
+                      link.indent ? 'pl-7 pr-3 text-xs' : 'px-3'
+                    } ${
                       isActive
                         ? 'text-white'
                         : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
@@ -146,7 +148,7 @@ export function Sidebar() {
                         : undefined
                     }
                   >
-                    {link.label}
+                    {link.indent ? `\u2514 ${link.label}` : link.label}
                   </Link>
                 );
               })}
