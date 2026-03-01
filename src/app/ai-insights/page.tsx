@@ -17,7 +17,7 @@ function formatCurrency(n: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Catalog Health Score — computed entirely from real data
+// Score helpers
 // ---------------------------------------------------------------------------
 
 function norm(value: number, benchmark: number): number {
@@ -39,6 +39,98 @@ function scoreLabel(score: number): string {
   return 'Critical';
 }
 
+// ---------------------------------------------------------------------------
+// Strategy Score — covers streaming, social, collaborations, funnel, catalog
+// ---------------------------------------------------------------------------
+
+interface StrategyScores {
+  streaming: number;
+  social: number;
+  collaborations: number;
+  funnel: number;
+  catalog: number;
+  composite: number;
+}
+
+function computeStrategyScores(stats: CatalogStats): StrategyScores {
+  // Streaming (30%): uses catalog data + known platform data
+  const monthlyListeners = 15200;
+  const playlistReach = 1_720_000;
+  const currentPlaylists = 75;
+  const avgPopularity = stats.total_songs > 0
+    ? Math.round(Object.values(stats.genre_distribution).reduce((a, b) => a + b, 0) / stats.total_songs * 33)
+    : 33;
+  const streaming = (
+    0.30 * norm(monthlyListeners, 50_000) +
+    0.25 * norm(playlistReach, 2_000_000) +
+    0.25 * norm(currentPlaylists, 75) +
+    0.20 * norm(avgPopularity, 33)
+  );
+
+  // Social (25%): from last IG audit
+  const engagementRate = 0.021;
+  const reelPerformance = 80;
+  const reachPct = 0.15;
+  const yoyTrend = 35;
+  const social = (
+    0.35 * norm(engagementRate, 0.05) +
+    0.25 * reelPerformance +
+    0.20 * norm(reachPct, 0.35) +
+    0.20 * yoyTrend
+  );
+
+  // Collaborations (20%)
+  const collabMultiplier = 2.2;
+  const musicCollabQuality = 95;
+  const collabRate = 0.15;
+  const ontoutUtil = 3;
+  const collaborations = (
+    0.35 * norm(collabMultiplier, 3.0) +
+    0.25 * musicCollabQuality +
+    0.25 * norm(collabRate, 0.25) +
+    0.15 * norm(ontoutUtil, 12)
+  );
+
+  // Funnel (15%)
+  const linkCtr = 0.005;
+  const profileVisitRate = 0.02;
+  const funnel = (
+    0.70 * norm(linkCtr, 0.03) +
+    0.30 * norm(profileVisitRate, 0.08)
+  );
+
+  // Catalog (10%): uses live data
+  const totalSongs = stats.total_songs;
+  const genreCount = Object.keys(stats.genre_distribution).length;
+  const avgStreams = totalSongs > 0 ? stats.total_streams / totalSongs : 0;
+  const catalog = (
+    0.40 * norm(totalSongs, 75) +
+    0.30 * norm(genreCount, 10) +
+    0.30 * norm(avgStreams, 200_000)
+  );
+
+  const composite = Math.round(
+    streaming * 0.30 +
+    social * 0.25 +
+    collaborations * 0.20 +
+    funnel * 0.15 +
+    catalog * 0.10
+  );
+
+  return {
+    streaming: Math.round(streaming),
+    social: Math.round(social),
+    collaborations: Math.round(collaborations),
+    funnel: Math.round(funnel),
+    catalog: Math.round(catalog),
+    composite,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Catalog Health Score — computed from live catalog data
+// ---------------------------------------------------------------------------
+
 interface CatalogScores {
   size: number;
   streaming: number;
@@ -49,41 +141,22 @@ interface CatalogScores {
 }
 
 function computeCatalogScores(stats: CatalogStats): CatalogScores {
-  // Size (20%): total songs and release rate
   const releasedPct = stats.total_songs > 0 ? stats.released / stats.total_songs : 0;
-  const size = (
-    0.50 * norm(stats.total_songs, 75) +
-    0.50 * norm(releasedPct * 100, 80)
-  );
+  const size = (0.50 * norm(stats.total_songs, 75) + 0.50 * norm(releasedPct * 100, 80));
 
-  // Streaming (25%): total and average streams
   const avgStreams = stats.total_songs > 0 ? stats.total_streams / stats.total_songs : 0;
-  const streaming = (
-    0.50 * norm(stats.total_streams, 5_000_000) +
-    0.50 * norm(avgStreams, 200_000)
-  );
+  const streaming = (0.50 * norm(stats.total_streams, 5_000_000) + 0.50 * norm(avgStreams, 200_000));
 
-  // Diversity (15%): genre and mood variety
   const genreCount = Object.keys(stats.genre_distribution).length;
   const moodCount = Object.keys(stats.mood_distribution).length;
   const artistCount = Object.keys(stats.artist_distribution).length;
-  const diversity = (
-    0.40 * norm(genreCount, 10) +
-    0.30 * norm(moodCount, 10) +
-    0.30 * norm(artistCount, 5)
-  );
+  const diversity = (0.40 * norm(genreCount, 10) + 0.30 * norm(moodCount, 10) + 0.30 * norm(artistCount, 5));
 
-  // Sync Readiness (25%): sync-available, stems, atmos
   const syncPct = stats.total_songs > 0 ? stats.sync_ready / stats.total_songs : 0;
   const stemPct = stats.total_songs > 0 ? stats.has_stems / stats.total_songs : 0;
   const atmosPct = stats.total_songs > 0 ? stats.has_atmos / stats.total_songs : 0;
-  const sync_readiness = (
-    0.40 * norm(syncPct * 100, 50) +
-    0.35 * norm(stemPct * 100, 50) +
-    0.25 * norm(atmosPct * 100, 30)
-  );
+  const sync_readiness = (0.40 * norm(syncPct * 100, 50) + 0.35 * norm(stemPct * 100, 50) + 0.25 * norm(atmosPct * 100, 30));
 
-  // Production Quality (15%): atmos, stems, album grouping
   const albumCount = stats.total_albums;
   const production = (
     0.35 * norm(stats.has_atmos, Math.max(stats.total_songs * 0.3, 1)) +
@@ -92,11 +165,7 @@ function computeCatalogScores(stats: CatalogStats): CatalogScores {
   );
 
   const composite = Math.round(
-    size * 0.20 +
-    streaming * 0.25 +
-    diversity * 0.15 +
-    sync_readiness * 0.25 +
-    production * 0.15
+    size * 0.20 + streaming * 0.25 + diversity * 0.15 + sync_readiness * 0.25 + production * 0.15
   );
 
   return {
@@ -110,18 +179,10 @@ function computeCatalogScores(stats: CatalogStats): CatalogScores {
 }
 
 // ---------------------------------------------------------------------------
-// SVG Radar Chart — catalog dimensions only
+// SVG Radar Chart — generic for any 5-axis score
 // ---------------------------------------------------------------------------
 
-function RadarChart({ scores }: { scores: CatalogScores }) {
-  const categories = [
-    { label: 'Size', value: scores.size },
-    { label: 'Streaming', value: scores.streaming },
-    { label: 'Diversity', value: scores.diversity },
-    { label: 'Sync Ready', value: scores.sync_readiness },
-    { label: 'Production', value: scores.production },
-  ];
-  const targets = [70, 60, 65, 70, 60];
+function RadarChart({ categories, targets }: { categories: { label: string; value: number }[]; targets: number[] }) {
   const n = categories.length;
   const cx = 150, cy = 150, r = 110;
 
@@ -143,28 +204,15 @@ function RadarChart({ scores }: { scores: CatalogScores }) {
         <polygon
           key={level}
           points={Array.from({ length: n }, (_, i) => point(i, level).join(',')).join(' ')}
-          fill="none"
-          stroke="#374151"
-          strokeWidth={0.5}
+          fill="none" stroke="#374151" strokeWidth={0.5}
         />
       ))}
       {categories.map((_, i) => {
         const [x, y] = point(i, 100);
         return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#374151" strokeWidth={0.5} />;
       })}
-      <polygon
-        points={polygon(targets)}
-        fill="none"
-        stroke="#6b7280"
-        strokeWidth={1}
-        strokeDasharray="4,4"
-      />
-      <polygon
-        points={polygon(categories.map(c => c.value))}
-        fill="rgba(29,185,84,0.15)"
-        stroke="#1DB954"
-        strokeWidth={2}
-      />
+      <polygon points={polygon(targets)} fill="none" stroke="#6b7280" strokeWidth={1} strokeDasharray="4,4" />
+      <polygon points={polygon(categories.map(c => c.value))} fill="rgba(29,185,84,0.15)" stroke="#1DB954" strokeWidth={2} />
       {categories.map((c, i) => {
         const [x, y] = point(i, c.value);
         return <circle key={i} cx={x} cy={y} r={4} fill="#1DB954" />;
@@ -172,14 +220,7 @@ function RadarChart({ scores }: { scores: CatalogScores }) {
       {categories.map((c, i) => {
         const [x, y] = point(i, 115);
         return (
-          <text
-            key={i}
-            x={x}
-            y={y}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="fill-gray-400 text-[10px]"
-          >
+          <text key={i} x={x} y={y} textAnchor="middle" dominantBaseline="middle" className="fill-gray-400 text-[10px]">
             {c.label}
           </text>
         );
@@ -189,167 +230,88 @@ function RadarChart({ scores }: { scores: CatalogScores }) {
 }
 
 // ---------------------------------------------------------------------------
-// Dynamic Insight generation from real catalog stats
+// Insight Cards
 // ---------------------------------------------------------------------------
 
 interface InsightCard {
+  icon?: string;
   title: string;
   highlight: string;
   explanation: string;
 }
 
+// --- Strategic insights (from manual audit data) ---
+const STRATEGIC_WORKING: InsightCard[] = [
+  { icon: '\uD83C\uDFC6', title: "Your Love's Not Wasted is a breakout hit", highlight: '1.9M streams \u00B7 5x the next closest song \u00B7 Pop: 56', explanation: 'Driving the majority of catalog discovery.' },
+  { icon: '\uD83C\uDFAC', title: 'Video/Reels dominate IG engagement', highlight: '202 avg likes/post \u00B7 3.2x photos \u00B7 51.3% of interactions', explanation: 'Every music release post that hit 500+ likes was a Reel.' },
+  { icon: '\uD83D\uDCCB', title: 'Currently playlisted songs have momentum', highlight: 'Delicate, Brick by Brick, Late Night \u00B7 Reach: 1,720,000', explanation: 'Being pushed by the algorithm \u2014 lean in.' },
+  { icon: '\uD83E\uDD1D', title: 'Collaborations are a cheat code', highlight: '261 avg likes (2.2x solo) \u00B7 @ontout: 13x \u00B7 Allen Blickle: 6 tracks, 2.29M streams', explanation: 'Collab content consistently outperforms solo content.' },
+];
+
+const STRATEGIC_OPPORTUNITIES: InsightCard[] = [
+  { icon: '\uD83D\uDC8E', title: 'Enjune catalog is underleveraged', highlight: '10.2M Enjune streams disconnected from 15K Jakke listeners', explanation: 'Cross-promote Enjune catalog for quick streaming gains.' },
+  { icon: '\uD83D\uDCC8', title: 'Brick by Brick + Late Night rising', highlight: 'Both currently playlisted with recent momentum', explanation: 'Pitch to more playlists while scores are climbing.' },
+  { icon: '\uD83C\uDFAF', title: '@ontout is massively under-leveraged', highlight: 'Only 3 posts despite 1,570 avg likes each \u00B7 13x multiplier sitting on the shelf', explanation: 'Even 2 sessions/quarter = 8 high-engagement posts/year.' },
+  { icon: '\uD83D\uDCF8', title: 'Stories are 84.3% of IG views but underutilized', highlight: '43,641 views in 30 days \u00B7 Massive reach channel', explanation: 'Could be used for release teasers, behind-the-scenes, session clips.' },
+];
+
+const STRATEGIC_RISKS: InsightCard[] = [
+  { icon: '\uD83D\uDCC9', title: '2025 IG engagement dropped 55%', highlight: '2024 avg: 216 likes/post \u2192 2025: 98 likes/post \u00B7 Volume up, quality down', explanation: 'Algorithm changes, audience fatigue, or content mix shift.' },
+  { icon: '\u23F3', title: 'YLNW streams are mostly legacy', highlight: '1.9M all-time but only 2,569 in recent 3-year window', explanation: 'Current velocity may be near-zero \u2014 focus on recent momentum songs.' },
+  { icon: '\uD83D\uDD17', title: 'Link-in-bio conversion is broken', highlight: '5 link taps / 936 profile visits = 0.5% conversion', explanation: 'The funnel from IG \u2192 streaming/website is effectively non-functional.' },
+  { icon: '\uD83D\uDCC9', title: 'Solo post engagement declining', highlight: 'Solo: 121 avg likes vs Collab: 261 \u00B7 Negative feedback loop', explanation: 'As the algorithm favors engagement, lower-performing solo posts get less reach.' },
+];
+
+// --- Dynamic insights generated from live catalog data ---
 function generateWorkingInsights(stats: CatalogStats): InsightCard[] {
   const insights: InsightCard[] = [];
   const releasedPct = stats.total_songs > 0 ? Math.round((stats.released / stats.total_songs) * 100) : 0;
-
   if (releasedPct >= 60) {
-    insights.push({
-      title: `${releasedPct}% of catalog is released`,
-      highlight: `${stats.released} of ${stats.total_songs} songs released`,
-      explanation: 'Strong release rate keeps the catalog active and discoverable.',
-    });
+    insights.push({ title: `${releasedPct}% of catalog is released`, highlight: `${stats.released} of ${stats.total_songs} songs released`, explanation: 'Strong release rate keeps the catalog active and discoverable.' });
   }
-
   if (stats.sync_ready > 0) {
     const syncPct = Math.round((stats.sync_ready / stats.total_songs) * 100);
-    insights.push({
-      title: `${stats.sync_ready} songs are sync-ready`,
-      highlight: `${syncPct}% of catalog available for licensing`,
-      explanation: 'These songs can be pitched for film, TV, and advertising placements.',
-    });
+    insights.push({ title: `${stats.sync_ready} songs are sync-ready`, highlight: `${syncPct}% of catalog available for licensing`, explanation: 'These songs can be pitched for film, TV, and advertising placements.' });
   }
-
   if (stats.has_atmos > 0) {
-    insights.push({
-      title: `${stats.has_atmos} songs have Dolby Atmos mixes`,
-      highlight: `Spatial audio catalog positioned for premium placements`,
-      explanation: 'Atmos-ready tracks qualify for premium playlist placements on Apple Music.',
-    });
+    insights.push({ title: `${stats.has_atmos} songs have Dolby Atmos mixes`, highlight: 'Spatial audio catalog positioned for premium placements', explanation: 'Atmos-ready tracks qualify for premium playlist placements on Apple Music.' });
   }
-
   if (stats.total_streams > 100_000) {
     const avgStreams = Math.round(stats.total_streams / Math.max(stats.total_songs, 1));
-    insights.push({
-      title: `${formatNumber(stats.total_streams)} total catalog streams`,
-      highlight: `${formatNumber(avgStreams)} average streams per song`,
-      explanation: 'Catalog is generating meaningful streaming activity.',
-    });
+    insights.push({ title: `${formatNumber(stats.total_streams)} total catalog streams`, highlight: `${formatNumber(avgStreams)} average streams per song`, explanation: 'Catalog is generating meaningful streaming activity.' });
   }
-
-  const topGenres = Object.entries(stats.genre_distribution).sort((a, b) => b[1] - a[1]);
-  if (topGenres.length >= 2) {
-    insights.push({
-      title: `${topGenres.length} genres across the catalog`,
-      highlight: `Led by ${topGenres[0][0]} (${topGenres[0][1]} songs) and ${topGenres[1][0]} (${topGenres[1][1]} songs)`,
-      explanation: 'Genre diversity opens up more playlist and licensing opportunities.',
-    });
-  }
-
   return insights.slice(0, 4);
 }
 
 function generateOpportunityInsights(stats: CatalogStats): InsightCard[] {
   const insights: InsightCard[] = [];
-
   const notSyncReady = stats.total_songs - stats.sync_ready;
   if (notSyncReady > 0 && stats.sync_ready > 0) {
-    insights.push({
-      title: `${notSyncReady} songs could be made sync-ready`,
-      highlight: `Only ${Math.round((stats.sync_ready / stats.total_songs) * 100)}% of catalog is sync-available`,
-      explanation: 'Review these songs for sync clearance to expand licensing potential.',
-    });
+    insights.push({ title: `${notSyncReady} songs could be made sync-ready`, highlight: `Only ${Math.round((stats.sync_ready / stats.total_songs) * 100)}% of catalog is sync-available`, explanation: 'Review these songs for sync clearance to expand licensing potential.' });
   }
-
   const withoutStems = stats.total_songs - stats.has_stems;
   if (withoutStems > 0 && stats.has_stems > 0) {
-    insights.push({
-      title: `${withoutStems} songs are missing stems`,
-      highlight: `Stems complete for ${stats.has_stems} of ${stats.total_songs} songs`,
-      explanation: 'Complete stem packages make songs more attractive for sync and remix opportunities.',
-    });
+    insights.push({ title: `${withoutStems} songs are missing stems`, highlight: `Stems complete for ${stats.has_stems} of ${stats.total_songs} songs`, explanation: 'Complete stem packages make songs more attractive for sync and remix opportunities.' });
   }
-
-  const withoutAtmos = stats.total_songs - stats.has_atmos;
-  if (withoutAtmos > 0 && stats.has_atmos > 0) {
-    insights.push({
-      title: `${withoutAtmos} songs could get Atmos mixes`,
-      highlight: `Currently ${stats.has_atmos} of ${stats.total_songs} songs have spatial audio`,
-      explanation: 'Atmos mixes unlock premium Apple Music placements and higher per-stream rates.',
-    });
-  }
-
   if (stats.unreleased > 0) {
-    insights.push({
-      title: `${stats.unreleased} unreleased songs in the catalog`,
-      highlight: `Potential new releases waiting to be scheduled`,
-      explanation: 'Review unreleased tracks for release readiness and strategic timing.',
-    });
+    insights.push({ title: `${stats.unreleased} unreleased songs in the catalog`, highlight: 'Potential new releases waiting to be scheduled', explanation: 'Review unreleased tracks for release readiness and strategic timing.' });
   }
-
-  if (stats.in_progress > 0) {
-    insights.push({
-      title: `${stats.in_progress} songs currently in progress`,
-      highlight: `Active pipeline of upcoming material`,
-      explanation: 'Keep momentum by moving these toward completion.',
-    });
-  }
-
   return insights.slice(0, 4);
 }
 
 function generateRiskInsights(stats: CatalogStats): InsightCard[] {
   const insights: InsightCard[] = [];
-
-  // Stream concentration risk
-  if (stats.total_songs > 3 && stats.total_streams > 0) {
-    const artists = Object.entries(stats.artist_distribution);
-    if (artists.length === 1) {
-      insights.push({
-        title: 'All streams under a single artist',
-        highlight: `${artists[0][0]}: ${stats.total_songs} songs, ${formatNumber(stats.total_streams)} streams`,
-        explanation: 'Consider building catalog under additional artist names for diversification.',
-      });
-    }
-  }
-
-  // Low sync readiness
   const syncPct = stats.total_songs > 0 ? Math.round((stats.sync_ready / stats.total_songs) * 100) : 0;
   if (syncPct < 30 && stats.total_songs > 0) {
-    insights.push({
-      title: `Only ${syncPct}% of catalog is sync-ready`,
-      highlight: `${stats.sync_ready} of ${stats.total_songs} songs available for licensing`,
-      explanation: 'Low sync availability limits revenue from film, TV, and ad placements.',
-    });
+    insights.push({ title: `Only ${syncPct}% of catalog is sync-ready`, highlight: `${stats.sync_ready} of ${stats.total_songs} songs available for licensing`, explanation: 'Low sync availability limits revenue from film, TV, and ad placements.' });
   }
-
-  // No stems
   if (stats.has_stems === 0 && stats.total_songs > 0) {
-    insights.push({
-      title: 'No songs have stems complete',
-      highlight: 'Stems are required for most sync placements',
-      explanation: 'Prioritize creating stem packages for your highest-streaming songs.',
-    });
+    insights.push({ title: 'No songs have stems complete', highlight: 'Stems are required for most sync placements', explanation: 'Prioritize creating stem packages for your highest-streaming songs.' });
   }
-
-  // Low release rate
   const releasedPct = stats.total_songs > 0 ? Math.round((stats.released / stats.total_songs) * 100) : 0;
   if (releasedPct < 50 && stats.total_songs > 3) {
-    insights.push({
-      title: `${100 - releasedPct}% of catalog is unreleased`,
-      highlight: `${stats.unreleased + stats.in_progress} songs not yet available to listeners`,
-      explanation: 'Unreleased catalog generates zero streams. Review for release readiness.',
-    });
+    insights.push({ title: `${100 - releasedPct}% of catalog is unreleased`, highlight: `${stats.unreleased + stats.in_progress} songs not yet available to listeners`, explanation: 'Unreleased catalog generates zero streams. Review for release readiness.' });
   }
-
-  // No Atmos at all
-  if (stats.has_atmos === 0 && stats.total_songs > 0) {
-    insights.push({
-      title: 'No Dolby Atmos mixes in catalog',
-      highlight: 'Missing spatial audio format entirely',
-      explanation: 'Apple Music features Atmos tracks prominently. Consider mixing your top songs.',
-    });
-  }
-
   return insights.slice(0, 4);
 }
 
@@ -361,6 +323,7 @@ function InsightSection({ title, color, cards }: { title: string; color: string;
       <div className="space-y-3">
         {cards.map((card, i) => (
           <div key={i} className="flex gap-3 rounded-lg bg-gray-900/50 p-3">
+            {card.icon && <span className="text-xl">{card.icon}</span>}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white">{card.title}</p>
               <p className="mt-0.5 text-xs font-medium" style={{ color }}>{card.highlight}</p>
@@ -374,7 +337,107 @@ function InsightSection({ title, color, cards }: { title: string; color: string;
 }
 
 // ---------------------------------------------------------------------------
-// Data source placeholder for future integrations
+// Action Items
+// ---------------------------------------------------------------------------
+
+interface ActionItem {
+  icon: string;
+  title: string;
+  effort: { label: string; value: number };
+  impact: { label: string; value: number };
+  dataPoint: string;
+  priority: 'P0' | 'P1' | 'P2' | 'P3';
+}
+
+const ACTION_ITEMS: ActionItem[] = [
+  { icon: '\uD83C\uDFAF', title: 'Schedule 2+ @ontout sessions per quarter', effort: { label: 'Low', value: 1 }, impact: { label: 'Very High', value: 5 }, dataPoint: '13x engagement multiplier', priority: 'P0' },
+  { icon: '\uD83C\uDFA5', title: 'Create release-day Reels for every drop', effort: { label: 'Medium', value: 2 }, impact: { label: 'Very High', value: 5 }, dataPoint: '3.2x engagement vs photos', priority: 'P0' },
+  { icon: '\uD83C\uDFB5', title: 'Pitch Brick by Brick + Late Night to playlists', effort: { label: 'Medium', value: 2 }, impact: { label: 'High', value: 4 }, dataPoint: 'Currently playlisted w/ momentum', priority: 'P0' },
+  { icon: '\uD83D\uDD04', title: 'Cross-promote Enjune on Jakke socials', effort: { label: 'Low', value: 1 }, impact: { label: 'High', value: 4 }, dataPoint: '10.2M Enjune streams untapped', priority: 'P1' },
+  { icon: '\uD83D\uDD17', title: 'Fix link-in-bio (test Linktree/Stan Store)', effort: { label: 'Low', value: 1 }, impact: { label: 'High', value: 4 }, dataPoint: '0.5% CTR is critically low', priority: 'P1' },
+  { icon: '\u23F0', title: 'Test posting schedule (Tu/Th 7pm vs current)', effort: { label: 'Low', value: 1 }, impact: { label: 'Medium', value: 3 }, dataPoint: '55% engagement drop in 2025', priority: 'P1' },
+  { icon: '\uD83D\uDCC8', title: 'Increase collaboration ratio to 25%', effort: { label: 'Medium', value: 3 }, impact: { label: 'High', value: 4 }, dataPoint: '2.2x multiplier on collab posts', priority: 'P2' },
+  { icon: '\uD83D\uDCF1', title: 'Use Stories for promo (84% of views)', effort: { label: 'Low', value: 1 }, impact: { label: 'Medium', value: 3 }, dataPoint: '43,641 Story views/month', priority: 'P2' },
+  { icon: '\uD83D\uDD0D', title: 'Diagnose 2025 engagement drop', effort: { label: 'High', value: 4 }, impact: { label: 'Medium', value: 3 }, dataPoint: '216 \u2192 98 avg likes YoY', priority: 'P3' },
+];
+
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  P0: { label: 'DO NOW', color: '#F44336', bg: 'bg-red-950/30 border-red-800/50' },
+  P1: { label: 'DO NEXT', color: '#FFC107', bg: 'bg-yellow-950/30 border-yellow-800/50' },
+  P2: { label: 'EXPERIMENT', color: '#2196F3', bg: 'bg-blue-950/30 border-blue-800/50' },
+  P3: { label: 'INVESTIGATE', color: '#8b949e', bg: 'bg-gray-800/50 border-gray-700/50' },
+};
+
+// ---------------------------------------------------------------------------
+// Effort/Impact Matrix (SVG)
+// ---------------------------------------------------------------------------
+
+function EffortImpactMatrix({ items }: { items: ActionItem[] }) {
+  const w = 400, h = 300;
+  const pad = { left: 40, right: 20, top: 20, bottom: 35 };
+  const pw = w - pad.left - pad.right;
+  const ph = h - pad.top - pad.bottom;
+
+  function x(effort: number) { return pad.left + ((effort - 0.5) / 5) * pw; }
+  function y(impact: number) { return pad.top + ph - ((impact - 0.5) / 5) * ph; }
+
+  const midX = x(2.5);
+  const midY = y(3);
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-[500px]">
+      <rect x={pad.left} y={pad.top} width={midX - pad.left} height={midY - pad.top} fill="rgba(29,185,84,0.05)" />
+      <rect x={midX} y={pad.top} width={w - pad.right - midX} height={midY - pad.top} fill="rgba(33,150,243,0.05)" />
+      <rect x={pad.left} y={midY} width={midX - pad.left} height={h - pad.bottom - midY} fill="rgba(139,148,158,0.05)" />
+      <rect x={midX} y={midY} width={w - pad.right - midX} height={h - pad.bottom - midY} fill="rgba(255,152,0,0.05)" />
+      <line x1={midX} y1={pad.top} x2={midX} y2={h - pad.bottom} stroke="#4b5563" strokeWidth={1} strokeDasharray="4,4" />
+      <line x1={pad.left} y1={midY} x2={w - pad.right} y2={midY} stroke="#4b5563" strokeWidth={1} strokeDasharray="4,4" />
+      <text x={pad.left + 6} y={pad.top + 16} className="fill-green-500/60 text-[9px] font-semibold">QUICK WINS</text>
+      <text x={w - pad.right - 6} y={pad.top + 16} textAnchor="end" className="fill-blue-500/60 text-[9px] font-semibold">BIG BETS</text>
+      <text x={pad.left + 6} y={h - pad.bottom - 6} className="fill-gray-500/60 text-[9px] font-semibold">LOW PRIORITY</text>
+      <text x={w - pad.right - 6} y={h - pad.bottom - 6} textAnchor="end" className="fill-orange-500/60 text-[9px] font-semibold">RESOURCE HEAVY</text>
+      <text x={w / 2} y={h - 4} textAnchor="middle" className="fill-gray-500 text-[10px]">Effort</text>
+      <text x={10} y={h / 2} textAnchor="middle" transform={`rotate(-90, 10, ${h / 2})`} className="fill-gray-500 text-[10px]">Impact</text>
+      {items.map((item, i) => {
+        const color = PRIORITY_CONFIG[item.priority].color;
+        return (
+          <g key={i}>
+            <circle cx={x(item.effort.value)} cy={y(item.impact.value)} r={11} fill={color} opacity={0.8} />
+            <text x={x(item.effort.value)} y={y(item.impact.value) + 1} textAnchor="middle" dominantBaseline="middle" className="text-[10px]">{item.icon}</text>
+          </g>
+        );
+      })}
+      <rect x={pad.left} y={pad.top} width={pw} height={ph} fill="none" stroke="#374151" strokeWidth={1} />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Key Metrics (social + platform)
+// ---------------------------------------------------------------------------
+
+interface KeyMetric {
+  icon: string;
+  label: string;
+  value: string;
+  subMetric: string;
+  color: string;
+}
+
+const SOCIAL_METRICS: KeyMetric[] = [
+  { icon: '\uD83D\uDCCA', label: 'IG Engagement Rate', value: '2.1%', subMetric: '\u25BC from 3.8% (2024)', color: '#F44336' },
+  { icon: '\uD83C\uDFA5', label: 'Reel vs Photo', value: '3.2x', subMetric: 'Reels win (202 vs 64 avg)', color: '#1DB954' },
+  { icon: '\uD83D\uDD17', label: 'Link-in-Bio CTR', value: '0.5%', subMetric: '\u25BC critically low', color: '#F44336' },
+  { icon: '\uD83E\uDD1D', label: 'Collab Multiplier', value: '2.2x', subMetric: 'vs solo posts', color: '#FFC107' },
+  { icon: '\uD83C\uDFAF', label: '@ontout Multiplier', value: '13x', subMetric: '3 posts only', color: '#1DB954' },
+  { icon: '\uD83C\uDFB5', label: 'Playlist Reach', value: '1.72M', subMetric: '75 playlists', color: '#1DB954' },
+  { icon: '\uD83D\uDCF1', label: 'Story % of IG Views', value: '84.3%', subMetric: 'mostly untapped', color: '#FFC107' },
+  { icon: '\uD83C\uDFA7', label: 'Enjune Streams', value: '10.2M', subMetric: '145K listeners', color: '#2196F3' },
+  { icon: '\u2B50', label: 'Avg Popularity Score', value: '35/100', subMetric: 'catalog average', color: '#8b949e' },
+];
+
+// ---------------------------------------------------------------------------
+// Data Sources
 // ---------------------------------------------------------------------------
 
 interface DataSource {
@@ -392,6 +455,13 @@ const DATA_SOURCES: DataSource[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Tab config
+// ---------------------------------------------------------------------------
+
+const TABS = ['Overview', 'Strategy', 'Catalog', 'Actions'] as const;
+type TabKey = (typeof TABS)[number];
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -400,6 +470,7 @@ export default function AIInsightsPage() {
   const [stats, setStats] = useState<CatalogStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>('Overview');
 
   useEffect(() => {
     let cancelled = false;
@@ -436,22 +507,39 @@ export default function AIInsightsPage() {
     );
   }
 
-  const scores = computeCatalogScores(stats);
+  const strategyScores = computeStrategyScores(stats);
+  const catalogScores = computeCatalogScores(stats);
 
-  const scoreCategories = [
-    { name: 'Catalog Size', score: scores.size, weight: '20%' },
-    { name: 'Streaming', score: scores.streaming, weight: '25%' },
-    { name: 'Diversity', score: scores.diversity, weight: '15%' },
-    { name: 'Sync Readiness', score: scores.sync_readiness, weight: '25%' },
-    { name: 'Production', score: scores.production, weight: '15%' },
+  const strategyCats = [
+    { icon: '\uD83C\uDFB5', name: 'Streaming', score: strategyScores.streaming, weight: '30%' },
+    { icon: '\uD83D\uDCF1', name: 'Social', score: strategyScores.social, weight: '25%' },
+    { icon: '\uD83E\uDD1D', name: 'Collaborations', score: strategyScores.collaborations, weight: '20%' },
+    { icon: '\uD83D\uDD17', name: 'Funnel', score: strategyScores.funnel, weight: '15%' },
+    { icon: '\uD83D\uDCBF', name: 'Catalog', score: strategyScores.catalog, weight: '10%' },
   ];
 
-  // Generate dynamic insights from real data
+  const catalogCats = [
+    { name: 'Catalog Size', score: catalogScores.size, weight: '20%' },
+    { name: 'Streaming', score: catalogScores.streaming, weight: '25%' },
+    { name: 'Diversity', score: catalogScores.diversity, weight: '15%' },
+    { name: 'Sync Readiness', score: catalogScores.sync_readiness, weight: '25%' },
+    { name: 'Production', score: catalogScores.production, weight: '15%' },
+  ];
+
+  const topP0 = ACTION_ITEMS.find(a => a.priority === 'P0')!;
+
+  // Group action items by priority
+  const actionsByPriority: Record<string, ActionItem[]> = {};
+  for (const item of ACTION_ITEMS) {
+    if (!actionsByPriority[item.priority]) actionsByPriority[item.priority] = [];
+    actionsByPriority[item.priority].push(item);
+  }
+
+  // Live catalog data
   const workingInsights = generateWorkingInsights(stats);
   const opportunityInsights = generateOpportunityInsights(stats);
   const riskInsights = generateRiskInsights(stats);
 
-  // Derive catalog metrics from stats
   const topGenres = Object.entries(stats.genre_distribution).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topMoods = Object.entries(stats.mood_distribution).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const syncPct = stats.total_songs > 0 ? Math.round((stats.sync_ready / stats.total_songs) * 100) : 0;
@@ -462,7 +550,6 @@ export default function AIInsightsPage() {
   const now = new Date();
   const monthYear = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  // Build real key metrics from catalog data
   const catalogMetrics = [
     { label: 'Total Songs', value: stats.total_songs.toString(), subMetric: `${stats.released} released, ${stats.unreleased} unreleased`, color: '#1DB954' },
     { label: 'Total Streams', value: formatNumber(stats.total_streams), subMetric: `${formatNumber(avgStreams)} avg per song`, color: stats.total_streams > 100_000 ? '#1DB954' : '#FFC107' },
@@ -470,197 +557,333 @@ export default function AIInsightsPage() {
     { label: 'Sync Ready', value: `${syncPct}%`, subMetric: `${stats.sync_ready} of ${stats.total_songs} songs`, color: syncPct >= 50 ? '#1DB954' : syncPct >= 25 ? '#FFC107' : '#F44336' },
     { label: 'Stems Complete', value: stats.has_stems.toString(), subMetric: `of ${stats.total_songs} songs`, color: stats.has_stems > 0 ? '#1DB954' : '#F44336' },
     { label: 'Atmos Mixes', value: `${atmosPct}%`, subMetric: `${stats.has_atmos} songs`, color: stats.has_atmos > 0 ? '#1DB954' : '#8b949e' },
-    { label: 'Genres', value: Object.keys(stats.genre_distribution).length.toString(), subMetric: topGenres.length > 0 ? `led by ${topGenres[0][0]}` : 'no genre data', color: '#9333ea' },
-    { label: 'Avg BPM', value: stats.avg_bpm ? stats.avg_bpm.toString() : '--', subMetric: stats.avg_bpm ? 'catalog average' : 'no BPM data', color: stats.avg_bpm ? '#2196F3' : '#8b949e' },
-    { label: 'Albums/EPs', value: stats.total_albums.toString(), subMetric: stats.total_albums > 0 ? 'in catalog' : 'no album groupings', color: stats.total_albums > 0 ? '#1DB954' : '#8b949e' },
   ];
 
   return (
     <div>
       <PageHeader title="AI Insights" />
 
-      {/* Catalog Health Score Hero */}
-      <div className="mt-6 rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Catalog Health Score</h3>
-          <span className="text-xs text-gray-500">{monthYear}</span>
-        </div>
-        <div className="mt-3 flex items-center gap-4">
-          <span className="text-5xl font-bold" style={{ color: scoreColor(scores.composite) }}>{scores.composite}</span>
-          <div className="flex-1">
-            <div className="h-3 rounded-full bg-gray-700">
-              <div
-                className="h-3 rounded-full transition-all"
-                style={{ width: `${scores.composite}%`, backgroundColor: scoreColor(scores.composite) }}
-              />
+      {/* This Week's Focus — Hero Banner */}
+      <div className="mt-4 rounded-xl p-5" style={{ background: 'linear-gradient(135deg, #F4433622, #FFC10722)' }}>
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">This Week&apos;s Focus</p>
+        <div className="mt-2 flex items-start gap-3">
+          <span className="text-2xl">{topP0.icon}</span>
+          <div>
+            <p className="text-lg font-bold text-white">{topP0.title}</p>
+            <p className="mt-1 text-sm text-gray-300">{topP0.dataPoint}</p>
+            <div className="mt-2 flex gap-3 text-xs text-gray-400">
+              <span>Effort: {topP0.effort.label}</span>
+              <span>Impact: {topP0.impact.label}</span>
             </div>
-            <p className="mt-1 text-xs text-gray-400">{scoreLabel(scores.composite)} — computed from live catalog data</p>
           </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {scoreCategories.map(cat => (
-            <div
-              key={cat.name}
-              className="flex items-center gap-1.5 rounded-full px-3 py-1"
-              style={{ backgroundColor: `${scoreColor(cat.score)}12` }}
-            >
-              <span className="text-xs text-gray-300">{cat.name}</span>
-              <span className="text-xs font-bold" style={{ color: scoreColor(cat.score) }}>{cat.score}</span>
-            </div>
-          ))}
         </div>
       </div>
 
-      {/* Catalog Shape (Radar) + Score Breakdown */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-5">
-        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5 lg:col-span-3">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Catalog Shape</h3>
-          <div className="flex justify-center">
-            <RadarChart scores={scores} />
+      {/* Dual Score Heroes */}
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        {/* Strategy Score */}
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Strategy Score</h3>
+            <span className="text-xs text-gray-500">{monthYear}</span>
           </div>
-          <div className="mt-2 flex justify-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><span className="inline-block h-2 w-4 rounded bg-[#1DB954]" /> Current</span>
-            <span className="flex items-center gap-1"><span className="inline-block h-2 w-4 rounded border border-gray-500 border-dashed" /> Target</span>
+          <div className="mt-3 flex items-center gap-4">
+            <span className="text-4xl font-bold" style={{ color: scoreColor(strategyScores.composite) }}>{strategyScores.composite}</span>
+            <div className="flex-1">
+              <div className="h-3 rounded-full bg-gray-700">
+                <div className="h-3 rounded-full transition-all" style={{ width: `${strategyScores.composite}%`, backgroundColor: scoreColor(strategyScores.composite) }} />
+              </div>
+              <p className="mt-1 text-xs text-gray-400">{scoreLabel(strategyScores.composite)}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {strategyCats.map(cat => (
+              <div key={cat.name} className="flex items-center gap-1 rounded-full px-2 py-0.5" style={{ backgroundColor: `${scoreColor(cat.score)}12` }}>
+                <span className="text-xs">{cat.icon}</span>
+                <span className="text-[10px] text-gray-300">{cat.name}</span>
+                <span className="text-[10px] font-bold" style={{ color: scoreColor(cat.score) }}>{cat.score}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5 lg:col-span-2">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Score Breakdown</h3>
-          <div className="space-y-4">
-            {scoreCategories.map(cat => (
-              <div key={cat.name}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-300">{cat.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold" style={{ color: scoreColor(cat.score) }}>{cat.score}</span>
-                    <span className="text-xs text-gray-500">{scoreLabel(cat.score)}</span>
-                  </div>
-                </div>
-                <div className="mt-1 flex items-center gap-2">
-                  <div className="flex-1 h-1.5 rounded-full bg-gray-700">
-                    <div
-                      className="h-1.5 rounded-full transition-all"
-                      style={{ width: `${cat.score}%`, backgroundColor: scoreColor(cat.score) }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-500 w-8 text-right">{cat.weight}</span>
-                </div>
+        {/* Catalog Health Score */}
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Catalog Health</h3>
+            <span className="rounded-full bg-green-900/30 px-2 py-0.5 text-[10px] text-green-400">Live Data</span>
+          </div>
+          <div className="mt-3 flex items-center gap-4">
+            <span className="text-4xl font-bold" style={{ color: scoreColor(catalogScores.composite) }}>{catalogScores.composite}</span>
+            <div className="flex-1">
+              <div className="h-3 rounded-full bg-gray-700">
+                <div className="h-3 rounded-full transition-all" style={{ width: `${catalogScores.composite}%`, backgroundColor: scoreColor(catalogScores.composite) }} />
+              </div>
+              <p className="mt-1 text-xs text-gray-400">{scoreLabel(catalogScores.composite)} — computed from live data</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {catalogCats.map(cat => (
+              <div key={cat.name} className="flex items-center gap-1 rounded-full px-2 py-0.5" style={{ backgroundColor: `${scoreColor(cat.score)}12` }}>
+                <span className="text-[10px] text-gray-300">{cat.name}</span>
+                <span className="text-[10px] font-bold" style={{ color: scoreColor(cat.score) }}>{cat.score}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Dynamic Insights */}
-      <div className="mt-6 space-y-4">
-        <InsightSection title="What's Working" color="#1DB954" cards={workingInsights} />
-        <InsightSection title="Opportunities" color="#FFC107" cards={opportunityInsights} />
-        <InsightSection title="Risks & Gaps" color="#F44336" cards={riskInsights} />
+      {/* Tabs */}
+      <div className="mt-6 flex gap-1 rounded-lg bg-gray-800/50 p-1">
+        {TABS.map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === tab
+                ? 'bg-gray-700 text-white'
+                : 'text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
-      {/* Key Metrics Grid — all from real data */}
-      <div className="mt-6">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Key Metrics</h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {catalogMetrics.map((metric, i) => (
-            <div key={i} className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-4">
-              <span className="text-xs text-gray-400">{metric.label}</span>
-              <p className="mt-2 text-2xl font-bold" style={{ color: metric.color }}>{metric.value}</p>
-              <p className="mt-0.5 text-xs text-gray-500">{metric.subMetric}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Tab Content */}
+      <div className="mt-4">
+        {activeTab === 'Overview' && (
+          <div className="space-y-6">
+            {/* Dual Radars */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Strategy Shape</h3>
+                <div className="flex justify-center">
+                  <RadarChart
+                    categories={strategyCats.map(c => ({ label: c.name, value: c.score }))}
+                    targets={[80, 70, 75, 60, 70]}
+                  />
+                </div>
+                <div className="mt-2 flex justify-center gap-4 text-xs text-gray-500">
+                  <span className="flex items-center gap-1"><span className="inline-block h-2 w-4 rounded bg-[#1DB954]" /> Current</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-2 w-4 rounded border border-gray-500 border-dashed" /> Target</span>
+                </div>
+              </div>
 
-      {/* Catalog Intelligence (live from API) */}
-      <div className="mt-6">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Catalog Intelligence</h3>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Catalog Summary */}
-          <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-orange-400">Catalog Summary</h4>
-            <div className="space-y-3 text-sm">
-              <p className="text-gray-300">Your catalog has <span className="font-semibold text-white">{stats.total_songs} songs</span> with <span className="font-semibold text-white">{formatNumber(stats.total_streams)} total streams</span>.</p>
-              <p className="text-gray-300"><span className="font-semibold text-green-400">{releasedPct}%</span> of your catalog is released ({stats.released} songs).</p>
-              {stats.in_progress > 0 && <p className="text-gray-300"><span className="font-semibold text-orange-400">{stats.in_progress} songs</span> currently in progress.</p>}
+              <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Catalog Shape</h3>
+                <div className="flex justify-center">
+                  <RadarChart
+                    categories={catalogCats.map(c => ({ label: c.name, value: c.score }))}
+                    targets={[70, 60, 65, 70, 60]}
+                  />
+                </div>
+                <div className="mt-2 flex justify-center gap-4 text-xs text-gray-500">
+                  <span className="flex items-center gap-1"><span className="inline-block h-2 w-4 rounded bg-[#1DB954]" /> Current</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-2 w-4 rounded border border-gray-500 border-dashed" /> Target</span>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Top Genres */}
-          <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-purple-400">Top Genres</h4>
-            {topGenres.length === 0 ? (
-              <p className="text-sm text-gray-500">No genre data available.</p>
-            ) : (
-              <div className="space-y-2">
-                {topGenres.map(([genre, count], i) => (
-                  <div key={genre} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-300">{i + 1}. {genre}</span>
-                    <span className="text-sm font-medium text-white">{count} songs</span>
+            {/* Score Breakdowns */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <ScoreBreakdown title="Strategy Breakdown" categories={strategyCats} />
+              <ScoreBreakdown title="Catalog Breakdown" categories={catalogCats.map(c => ({ ...c, icon: undefined }))} />
+            </div>
+
+            {/* Key Metrics: Social */}
+            <div>
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Platform Metrics</h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {SOCIAL_METRICS.map((metric, i) => (
+                  <div key={i} className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{metric.icon}</span>
+                      <span className="text-xs text-gray-400">{metric.label}</span>
+                    </div>
+                    <p className="mt-2 text-2xl font-bold" style={{ color: metric.color }}>{metric.value}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">{metric.subMetric}</p>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Top Moods */}
-          <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-cyan-400">Top Moods</h4>
-            {topMoods.length === 0 ? (
-              <p className="text-sm text-gray-500">No mood data available.</p>
-            ) : (
-              <div className="space-y-2">
-                {topMoods.map(([mood, count], i) => (
-                  <div key={mood} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-300">{i + 1}. {mood}</span>
-                    <span className="text-sm font-medium text-white">{count} songs</span>
+            {/* Key Metrics: Catalog */}
+            <div>
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Catalog Metrics</h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {catalogMetrics.map((metric, i) => (
+                  <div key={i} className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-4">
+                    <span className="text-xs text-gray-400">{metric.label}</span>
+                    <p className="mt-2 text-2xl font-bold" style={{ color: metric.color }}>{metric.value}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">{metric.subMetric}</p>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Sync Readiness */}
-          <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-green-400">Sync Readiness</h4>
-            <div className="space-y-3 text-sm">
-              <p className="text-gray-300"><span className="font-semibold text-white">{syncPct}%</span> of your catalog is sync-ready ({stats.sync_ready} songs).</p>
-              <p className="text-gray-300"><span className="font-semibold text-white">{stats.has_stems}</span> songs have stems complete.</p>
-              <p className="text-gray-300"><span className="font-semibold text-white">{atmosPct}%</span> have Atmos mixes ({stats.has_atmos} songs).</p>
             </div>
           </div>
+        )}
 
-          {/* Key Distribution */}
-          <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-amber-400">Key Distribution</h4>
-            {Object.keys(stats.key_distribution).length === 0 ? (
-              <p className="text-sm text-gray-500">No key data available.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(stats.key_distribution).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([key, count]) => (
-                  <span key={key} className="rounded-full bg-amber-900/30 px-3 py-1 text-xs text-amber-300">
-                    {key} <span className="text-amber-400/70">({count})</span>
+        {activeTab === 'Strategy' && (
+          <div className="space-y-4">
+            <InsightSection title="What's Working" color="#1DB954" cards={STRATEGIC_WORKING} />
+            <InsightSection title="Opportunities" color="#FFC107" cards={STRATEGIC_OPPORTUNITIES} />
+            <InsightSection title="Risks" color="#F44336" cards={STRATEGIC_RISKS} />
+          </div>
+        )}
+
+        {activeTab === 'Catalog' && (
+          <div className="space-y-6">
+            {/* Dynamic insights from live data */}
+            <div className="space-y-4">
+              <InsightSection title="What's Working" color="#1DB954" cards={workingInsights} />
+              <InsightSection title="Opportunities" color="#FFC107" cards={opportunityInsights} />
+              <InsightSection title="Risks & Gaps" color="#F44336" cards={riskInsights} />
+            </div>
+
+            {/* Catalog Intelligence */}
+            <div>
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Catalog Intelligence</h3>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-orange-400">Catalog Summary</h4>
+                  <div className="space-y-3 text-sm">
+                    <p className="text-gray-300">Your catalog has <span className="font-semibold text-white">{stats.total_songs} songs</span> with <span className="font-semibold text-white">{formatNumber(stats.total_streams)} total streams</span>.</p>
+                    <p className="text-gray-300"><span className="font-semibold text-green-400">{releasedPct}%</span> of your catalog is released ({stats.released} songs).</p>
+                    {stats.in_progress > 0 && <p className="text-gray-300"><span className="font-semibold text-orange-400">{stats.in_progress} songs</span> currently in progress.</p>}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-purple-400">Top Genres</h4>
+                  {topGenres.length === 0 ? (
+                    <p className="text-sm text-gray-500">No genre data available.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {topGenres.map(([genre, count], i) => (
+                        <div key={genre} className="flex items-center justify-between">
+                          <span className="text-sm text-gray-300">{i + 1}. {genre}</span>
+                          <span className="text-sm font-medium text-white">{count} songs</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-cyan-400">Top Moods</h4>
+                  {topMoods.length === 0 ? (
+                    <p className="text-sm text-gray-500">No mood data available.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {topMoods.map(([mood, count], i) => (
+                        <div key={mood} className="flex items-center justify-between">
+                          <span className="text-sm text-gray-300">{i + 1}. {mood}</span>
+                          <span className="text-sm font-medium text-white">{count} songs</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-green-400">Sync Readiness</h4>
+                  <div className="space-y-3 text-sm">
+                    <p className="text-gray-300"><span className="font-semibold text-white">{syncPct}%</span> of your catalog is sync-ready ({stats.sync_ready} songs).</p>
+                    <p className="text-gray-300"><span className="font-semibold text-white">{stats.has_stems}</span> songs have stems complete.</p>
+                    <p className="text-gray-300"><span className="font-semibold text-white">{atmosPct}%</span> have Atmos mixes ({stats.has_atmos} songs).</p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-amber-400">Key Distribution</h4>
+                  {Object.keys(stats.key_distribution).length === 0 ? (
+                    <p className="text-sm text-gray-500">No key data available.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(stats.key_distribution).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([key, count]) => (
+                        <span key={key} className="rounded-full bg-amber-900/30 px-3 py-1 text-xs text-amber-300">
+                          {key} <span className="text-amber-400/70">({count})</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-blue-400">BPM Analysis</h4>
+                  <div className="text-sm text-gray-300">
+                    {stats.avg_bpm ? (
+                      <p>Average BPM across your catalog is <span className="font-semibold text-white">{stats.avg_bpm}</span>.</p>
+                    ) : (
+                      <p className="text-gray-500">No BPM data available.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'Actions' && (
+          <div className="space-y-6">
+            {/* Action Items */}
+            <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Action Items</h3>
+              <div className="space-y-4">
+                {(['P0', 'P1', 'P2', 'P3'] as const).map(priority => {
+                  const items = actionsByPriority[priority];
+                  if (!items || items.length === 0) return null;
+                  const config = PRIORITY_CONFIG[priority];
+                  return (
+                    <div key={priority}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: config.color }} />
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: config.color }}>{priority}: {config.label}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {items.map((item, i) => (
+                          <div key={i} className={`rounded-lg border p-3 ${config.bg}`}>
+                            <div className="flex items-start gap-3">
+                              <span className="text-lg">{item.icon}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-white">{item.title}</p>
+                                <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-400">
+                                  <span>Effort: {item.effort.label} ({item.effort.value}/5)</span>
+                                  <span>Impact: {item.impact.label} ({item.impact.value}/5)</span>
+                                </div>
+                                <p className="mt-1 text-xs text-gray-500">Data: {item.dataPoint}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Effort/Impact Matrix */}
+            <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Quick Wins vs Big Bets</h3>
+              <div className="flex justify-center">
+                <EffortImpactMatrix items={ACTION_ITEMS} />
+              </div>
+              <div className="mt-3 flex flex-wrap justify-center gap-3 text-xs">
+                {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+                  <span key={key} className="flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: config.color }} />
+                    <span className="text-gray-400">{key}: {config.label}</span>
                   </span>
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* BPM Analysis */}
-          <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-blue-400">BPM Analysis</h4>
-            <div className="text-sm text-gray-300">
-              {stats.avg_bpm ? (
-                <p>Average BPM across your catalog is <span className="font-semibold text-white">{stats.avg_bpm}</span>.</p>
-              ) : (
-                <p className="text-gray-500">No BPM data available.</p>
-              )}
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Data Sources */}
+      {/* Data Sources (always visible) */}
       <div className="mt-6">
         <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Data Sources</h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -691,7 +914,41 @@ export default function AIInsightsPage() {
 
       {/* Footer */}
       <div className="mt-8 border-t border-gray-800 py-4 text-center text-xs text-gray-600">
-        All metrics computed from live Notion catalog data &middot; {monthYear}
+        Strategy insights from manual audit + live catalog data &middot; {monthYear}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Score Breakdown (reusable)
+// ---------------------------------------------------------------------------
+
+function ScoreBreakdown({ title, categories }: { title: string; categories: { icon?: string; name: string; score: number; weight: string }[] }) {
+  return (
+    <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">{title}</h3>
+      <div className="space-y-4">
+        {categories.map(cat => (
+          <div key={cat.name}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {cat.icon && <span className="text-sm">{cat.icon}</span>}
+                <span className="text-sm text-gray-300">{cat.name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold" style={{ color: scoreColor(cat.score) }}>{cat.score}</span>
+                <span className="text-xs text-gray-500">{scoreLabel(cat.score)}</span>
+              </div>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <div className="flex-1 h-1.5 rounded-full bg-gray-700">
+                <div className="h-1.5 rounded-full transition-all" style={{ width: `${cat.score}%`, backgroundColor: scoreColor(cat.score) }} />
+              </div>
+              <span className="text-xs text-gray-500 w-8 text-right">{cat.weight}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
