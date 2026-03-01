@@ -97,17 +97,32 @@ export default function Dashboard() {
     );
   }
 
-  const kpis = [
-    { label: 'Total Songs', value: stats.total_songs.toString() },
-    { label: 'Released', value: stats.released.toString() },
-    { label: 'In Progress', value: stats.in_progress.toString() },
-    { label: 'Total Streams', value: formatNumber(stats.total_streams) },
-    { label: 'Est. Revenue', value: formatCurrency(stats.total_estimated_revenue) },
-    { label: 'Actual Revenue', value: royaltyData ? formatCurrency(royaltyData.total_revenue) : '$0.00' },
-    { label: 'Sync Ready', value: stats.sync_ready.toString() },
-    { label: 'Has Atmos', value: stats.has_atmos.toString() },
-    { label: 'Has Stems', value: stats.has_stems.toString() },
-    { label: 'Albums', value: stats.total_albums.toString() },
+  const kpiGroups = [
+    {
+      title: 'Catalog',
+      kpis: [
+        { label: 'Total Songs', value: stats.total_songs.toString() },
+        { label: 'Released', value: stats.released.toString() },
+        { label: 'In Progress', value: stats.in_progress.toString() },
+        { label: 'Albums', value: stats.total_albums.toString() },
+      ],
+    },
+    {
+      title: 'Performance',
+      kpis: [
+        { label: 'Total Streams', value: formatNumber(stats.total_streams) },
+        { label: 'Sync Ready', value: stats.sync_ready.toString() },
+        { label: 'Has Atmos', value: stats.has_atmos.toString() },
+        { label: 'Has Stems', value: stats.has_stems.toString() },
+      ],
+    },
+    {
+      title: 'Revenue',
+      kpis: [
+        { label: 'Est. Revenue', value: formatCurrency(stats.total_estimated_revenue) },
+        { label: 'Actual Revenue', value: royaltyData ? formatCurrency(royaltyData.total_revenue) : '$0.00' },
+      ],
+    },
   ];
 
   // Catalog health percentages
@@ -138,17 +153,24 @@ export default function Dashboard() {
     <div>
       <PageHeader title="Dashboard" />
 
-      {/* KPI Cards */}
-      <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
-        {kpis.map(kpi => {
-          const style = KPI_STYLES[kpi.label] ?? { color: 'text-white', border: 'border-l-gray-500' };
-          return (
-            <div key={kpi.label} className={`rounded-xl border border-gray-700/50 border-l-4 ${style.border} bg-gray-800/50 p-4`}>
-              <p className="text-xs font-medium uppercase tracking-wider text-gray-500">{kpi.label}</p>
-              <p className={`mt-1 text-2xl font-bold ${style.color}`}>{kpi.value}</p>
+      {/* KPI Cards — Grouped */}
+      <div className="mt-6 space-y-4">
+        {kpiGroups.map(group => (
+          <div key={group.title}>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500">{group.title}</p>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {group.kpis.map(kpi => {
+                const style = KPI_STYLES[kpi.label] ?? { color: 'text-white', border: 'border-l-gray-500' };
+                return (
+                  <div key={kpi.label} className={`rounded-xl border border-gray-700/50 border-l-4 ${style.border} bg-gray-800/50 p-4`}>
+                    <p className="text-xs font-medium uppercase tracking-wider text-gray-500">{kpi.label}</p>
+                    <p className={`mt-1 text-2xl font-bold ${style.color}`}>{kpi.value}</p>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       {/* Catalog Health Bar */}
