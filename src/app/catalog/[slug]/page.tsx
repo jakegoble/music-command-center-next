@@ -690,11 +690,19 @@ function ContractsTab({ song }: { song: SongDetail }) {
 
 // --- Tab: Press ---
 function PressTab({ song }: { song: SongDetail }) {
-  const songPress = PRESS_COVERAGE.filter(
-    p => p.song && p.song.toLowerCase() === song.title.toLowerCase()
+  const sortByDate = (items: PressCoverage[]) =>
+    [...items].sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return b.date.localeCompare(a.date);
+    });
+
+  const songPress = sortByDate(
+    PRESS_COVERAGE.filter(p => p.song && p.song.toLowerCase() === song.title.toLowerCase())
   );
-  const artistPress = PRESS_COVERAGE.filter(
-    p => p.artist.toLowerCase() === song.artist.toLowerCase() && !p.song
+  const artistPress = sortByDate(
+    PRESS_COVERAGE.filter(p => p.artist.toLowerCase() === song.artist.toLowerCase() && (!p.song || p.song.toLowerCase() !== song.title.toLowerCase()))
   );
   const allPress = [...songPress, ...artistPress];
 
@@ -704,7 +712,6 @@ function PressTab({ song }: { song: SongDetail }) {
         <div className="mb-4 text-4xl text-gray-700">&#128240;</div>
         <p className="text-lg font-medium text-gray-400">No press coverage found.</p>
         <p className="mt-2 max-w-md text-sm text-gray-500">When articles, reviews, and interviews are added, they&apos;ll appear here with publication details and type badges.</p>
-        {/* Placeholder card preview */}
         <div className="mt-6 w-full max-w-sm rounded-xl border border-dashed border-gray-700/50 p-4 opacity-30">
           <div className="flex items-center justify-between">
             <div>
@@ -725,6 +732,11 @@ function PressTab({ song }: { song: SongDetail }) {
     Mention: { bg: 'bg-gray-500/15', text: 'text-gray-400', border: 'border-gray-500/30' },
   };
 
+  const formatDate = (iso?: string) => {
+    if (!iso) return null;
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   const renderPressCard = (p: PressCoverage, key: string) => {
     const style = typeStyles[p.type];
     return (
@@ -735,18 +747,27 @@ function PressTab({ song }: { song: SongDetail }) {
         rel="noopener noreferrer"
         className="group rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 transition-colors hover:border-gray-600"
       >
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          {/* Thumbnail or initials fallback */}
+          {p.image ? (
+            <img src={p.image} alt={p.outlet} className="h-20 w-20 shrink-0 rounded-lg object-cover bg-gray-700" />
+          ) : (
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-gray-700/50 text-lg font-bold text-gray-500">
+              {p.outlet.slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-700/50 text-xs font-bold text-gray-400">
-                {p.outlet.slice(0, 2).toUpperCase()}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-white group-hover:text-orange-400">{p.outlet}</p>
+                {formatDate(p.date) && <p className="text-xs text-gray-500">{formatDate(p.date)}</p>}
               </div>
-              <p className="truncate font-medium text-white group-hover:text-orange-400">{p.outlet}</p>
+              <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>{p.type}</span>
             </div>
             <p className="mt-1.5 text-sm text-gray-400">{p.title}</p>
-            {p.song && <p className="mt-1 text-xs text-gray-500">Re: &ldquo;{p.song}&rdquo;</p>}
+            {p.excerpt && <p className="mt-1 truncate text-xs text-gray-500">{p.excerpt}</p>}
+            {p.song && <p className="mt-1 text-xs text-gray-600">Re: &ldquo;{p.song}&rdquo;</p>}
           </div>
-          <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>{p.type}</span>
         </div>
       </a>
     );
@@ -766,6 +787,7 @@ function PressTab({ song }: { song: SongDetail }) {
             </span>
           );
         })}
+        <span className="rounded-full border border-gray-700 px-3 py-1 text-xs text-gray-500">{allPress.length} total</span>
       </div>
 
       {songPress.length > 0 && (
