@@ -743,11 +743,37 @@ export default function CatalogPage() {
           )}
 
           {/* Pagination */}
-          {(hasMore || page > 1) && (
-            <div className="mt-4 flex items-center justify-center gap-4">
-              <button onClick={() => fetchSongs(page - 1)} disabled={page <= 1} className="rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-              <span className="text-sm text-gray-400">Page {page}</span>
-              <button onClick={() => fetchSongs(page + 1)} disabled={!hasMore} className="rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+          {total > 0 && (
+            <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+              <span className="text-xs text-gray-500">
+                Showing {Math.min((page - 1) * 50 + 1, total)}&ndash;{Math.min(page * 50, total)} of {total} songs
+              </span>
+              {(hasMore || page > 1) && (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => fetchSongs(page - 1)} disabled={page <= 1} className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                  {Array.from({ length: Math.ceil(total / 50) }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === Math.ceil(total / 50) || Math.abs(p - page) <= 1)
+                    .reduce<(number | 'ellipsis')[]>((acc, p, i, arr) => {
+                      if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('ellipsis');
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, i) =>
+                      p === 'ellipsis' ? (
+                        <span key={`e${i}`} className="px-1 text-gray-600">&hellip;</span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => fetchSongs(p as number)}
+                          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                            page === p ? 'bg-orange-600 text-white' : 'border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white'
+                          }`}
+                        >{p}</button>
+                      )
+                    )}
+                  <button onClick={() => fetchSongs(page + 1)} disabled={!hasMore} className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                </div>
+              )}
             </div>
           )}
         </>
