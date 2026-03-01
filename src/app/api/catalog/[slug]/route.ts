@@ -17,7 +17,7 @@ import {
 import { estimateRevenue, parseWriterSplits } from '@/lib/services/revenue';
 import { toSlug } from '@/lib/services/songs';
 import { parseNotes } from '@/lib/utils/parseNotes';
-import { generateTrackDescription } from '@/lib/utils/generateDescription';
+import { generateTrackDescription, generateHighlights } from '@/lib/utils/generateDescription';
 import type { SongDetail, CollaboratorSummary, ContractSummary, LicensingContactSummary, RoyaltyEntry } from '@/lib/types';
 import type { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints';
 
@@ -248,11 +248,15 @@ export async function GET(
         // Computed fields (set below)
         parsed_notes: null,
         generated_description: null,
+        highlights: [],
+        story_description: null,
       };
 
       // Compute parsed notes and generated description
       detail.parsed_notes = parseNotes(detail.notes);
       detail.generated_description = generateTrackDescription(detail);
+      detail.highlights = generateHighlights(detail);
+      // story_description: would come from a dedicated Notion rich text field if it exists
 
       return detail;
     });

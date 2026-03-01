@@ -129,19 +129,44 @@ function SongHero({ song }: { song: SongDetail }) {
 
 // --- Tab: Overview ---
 function OverviewTab({ song }: { song: SongDetail }) {
-  const descriptionText = song.generated_description
+  const descriptionText = song.story_description
+    ?? song.generated_description
     ?? song.parsed_notes?.description
     ?? null;
 
+  const artistColor = ARTIST_COLORS[song.artist as Artist] ?? '#F97316';
+
   return (
     <div className="space-y-4">
-      {/* Track Description */}
-      {descriptionText && (
-        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">About</h3>
-          <p className="text-sm leading-relaxed text-gray-300">{descriptionText}</p>
-        </div>
-      )}
+      {/* About — Story Section */}
+      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-6" style={{ borderLeftWidth: 4, borderLeftColor: artistColor }}>
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">About</h3>
+        {descriptionText ? (
+          <p className="text-base leading-relaxed text-gray-200">{descriptionText}</p>
+        ) : (
+          <p className="text-sm italic text-gray-500">No story written yet. Add a description in Notion to bring this section to life.</p>
+        )}
+
+        {/* Highlights */}
+        {song.highlights.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {song.highlights.map(h => (
+              <span key={h} className="rounded-full px-3 py-1 text-xs font-medium" style={{ backgroundColor: `${artistColor}18`, color: artistColor, border: `1px solid ${artistColor}40` }}>
+                {h}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Release context */}
+        {(song.distributor || song.parsed_notes?.label_info || song.release_date) && (
+          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t border-gray-700/30 pt-3 text-xs text-gray-500">
+            {song.distributor && <span>Distributor: <span className="text-gray-300">{song.distributor}</span></span>}
+            {song.parsed_notes?.label_info && <span>Label: <span className="text-gray-300">{song.parsed_notes.label_info}</span></span>}
+            {song.release_date && <span>Released: <span className="text-gray-300">{song.release_date}</span></span>}
+          </div>
+        )}
+      </div>
 
       {/* Release Info + Technical — 2-column grid */}
       <div className="grid gap-4 md:grid-cols-2">

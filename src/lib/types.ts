@@ -80,6 +80,8 @@ export interface SongDetail extends SongSummary {
     urls: string[];
   } | null;
   generated_description: string | null;
+  highlights: string[];
+  story_description: string | null;
   has_stereo_master: boolean;
   artwork_url: string | null;
   collaborators: CollaboratorSummary[];
