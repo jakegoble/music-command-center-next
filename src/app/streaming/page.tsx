@@ -177,14 +177,15 @@ export default function StreamingPage() {
     setIsLoading(true);
     setError(null);
 
-    const params = artist !== 'all' ? `?artist=${artistToParam(artist)}` : '';
+    const base = artist !== 'all' ? `?artist=${artistToParam(artist)}` : '';
+    const sep = base ? '&' : '?';
 
     Promise.all([
-      fetch(`/api/catalog${params}&limit=100&sort=total_streams&order=desc`).then(r => {
+      fetch(`/api/catalog${base}${sep}limit=100&sort=total_streams&order=desc`).then(r => {
         if (!r.ok) throw new Error(`Catalog: ${r.status}`);
         return r.json();
       }),
-      fetch(`/api/catalog/stats${params}`).then(r => {
+      fetch(`/api/catalog/stats${base}`).then(r => {
         if (!r.ok) throw new Error(`Stats: ${r.status}`);
         return r.json();
       }),
