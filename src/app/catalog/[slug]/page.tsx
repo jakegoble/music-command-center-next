@@ -685,7 +685,6 @@ function ContractsTab({ song }: { song: SongDetail }) {
 
 // --- Tab: Press ---
 function PressTab({ song }: { song: SongDetail }) {
-  // Find press for this specific song, then fallback to artist-level coverage
   const songPress = PRESS_COVERAGE.filter(
     p => p.song && p.song.toLowerCase() === song.title.toLowerCase()
   );
@@ -697,66 +696,150 @@ function PressTab({ song }: { song: SongDetail }) {
   if (allPress.length === 0) {
     return (
       <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
+        <div className="mb-4 text-4xl text-gray-700">&#128240;</div>
         <p className="text-lg font-medium text-gray-400">No press coverage found.</p>
-        <p className="mt-2 text-sm text-gray-500">Press articles for this song or artist will appear here.</p>
+        <p className="mt-2 max-w-md text-sm text-gray-500">When articles, reviews, and interviews are added, they&apos;ll appear here with publication details and type badges.</p>
+        {/* Placeholder card preview */}
+        <div className="mt-6 w-full max-w-sm rounded-xl border border-dashed border-gray-700/50 p-4 opacity-30">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="h-4 w-32 rounded bg-gray-700" />
+              <div className="mt-2 h-3 w-48 rounded bg-gray-800" />
+            </div>
+            <div className="h-5 w-16 rounded-full bg-purple-900/50" />
+          </div>
+        </div>
       </div>
     );
   }
 
-  const typeColors: Record<PressCoverage['type'], string> = {
-    Feature: 'bg-purple-900/50 text-purple-300',
-    Review: 'bg-blue-900/50 text-blue-300',
-    Interview: 'bg-green-900/50 text-green-300',
-    Mention: 'bg-gray-700/50 text-gray-300',
+  const typeStyles: Record<PressCoverage['type'], { bg: string; text: string; border: string }> = {
+    Feature: { bg: 'bg-orange-500/15', text: 'text-orange-400', border: 'border-orange-500/30' },
+    Review: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/30' },
+    Interview: { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/30' },
+    Mention: { bg: 'bg-gray-500/15', text: 'text-gray-400', border: 'border-gray-500/30' },
+  };
+
+  const renderPressCard = (p: PressCoverage, key: string) => {
+    const style = typeStyles[p.type];
+    return (
+      <a
+        key={key}
+        href={p.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 transition-colors hover:border-gray-600"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-700/50 text-xs font-bold text-gray-400">
+                {p.outlet.slice(0, 2).toUpperCase()}
+              </div>
+              <p className="truncate font-medium text-white group-hover:text-orange-400">{p.outlet}</p>
+            </div>
+            <p className="mt-1.5 text-sm text-gray-400">{p.title}</p>
+            {p.song && <p className="mt-1 text-xs text-gray-500">Re: &ldquo;{p.song}&rdquo;</p>}
+          </div>
+          <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>{p.type}</span>
+        </div>
+      </a>
+    );
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Stats bar */}
+      <div className="flex flex-wrap gap-3">
+        {(['Feature', 'Review', 'Interview', 'Mention'] as const).map(type => {
+          const count = allPress.filter(p => p.type === type).length;
+          if (count === 0) return null;
+          const style = typeStyles[type];
+          return (
+            <span key={type} className={`rounded-full border px-3 py-1 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>
+              {count} {type}{count > 1 ? 's' : ''}
+            </span>
+          );
+        })}
+      </div>
+
       {songPress.length > 0 && (
-        <p className="text-xs text-gray-500 uppercase tracking-wider">Coverage for &ldquo;{song.title}&rdquo;</p>
+        <>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Coverage for &ldquo;{song.title}&rdquo;</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {songPress.map((p, i) => renderPressCard(p, `song-${i}`))}
+          </div>
+        </>
       )}
-      {songPress.map((p, i) => (
-        <a
-          key={`song-${i}`}
-          href={p.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 transition-colors hover:border-gray-600"
-        >
-          <div>
-            <p className="font-medium text-white">{p.outlet}</p>
-            <p className="mt-0.5 text-xs text-gray-400">{p.title}</p>
+      {artistPress.length > 0 && (
+        <>
+          <p className={`text-xs font-semibold uppercase tracking-wider text-gray-500 ${songPress.length > 0 ? 'mt-2' : ''}`}>
+            {songPress.length > 0 ? `More from ${song.artist}` : `Press for ${song.artist}`}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {artistPress.map((p, i) => renderPressCard(p, `artist-${i}`))}
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeColors[p.type]}`}>{p.type}</span>
-            <span className="text-gray-500">&rarr;</span>
-          </div>
-        </a>
-      ))}
-      {artistPress.length > 0 && songPress.length > 0 && (
-        <p className="mt-4 text-xs text-gray-500 uppercase tracking-wider">More from {song.artist}</p>
+        </>
       )}
-      {artistPress.length > 0 && songPress.length === 0 && (
-        <p className="text-xs text-gray-500 uppercase tracking-wider">Press for {song.artist}</p>
+    </div>
+  );
+}
+
+// --- Tab: Lyrics ---
+function LyricsTab({ song }: { song: SongDetail }) {
+  const lyricsProviders = [
+    { label: 'LyricFind', submitted: song.lyricfind_submitted, url: null },
+    { label: 'Musixmatch', submitted: song.musixmatch_submitted, url: null },
+    { label: 'Genius', submitted: song.genius_submitted, url: null },
+  ];
+  const submittedProviders = lyricsProviders.filter(p => p.submitted);
+
+  return (
+    <div className="space-y-4">
+      {/* Lyrics status */}
+      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Lyrics Status</h3>
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+            song.lyrics_status === 'Written' ? 'bg-green-500/15 text-green-400 border border-green-500/30' : 'bg-gray-700/50 text-gray-400'
+          }`}>
+            {song.lyrics_status ?? 'Not Written'}
+          </span>
+        </div>
+
+        {/* Songwriter credits */}
+        {song.songwriters && (
+          <div className="mt-4 border-t border-gray-700/30 pt-3">
+            <p className="text-xs text-gray-500">Written by</p>
+            <p className="mt-1 text-sm text-gray-300">{song.songwriters}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Lyrics providers */}
+      {submittedProviders.length > 0 && (
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Available On</h3>
+          <div className="flex flex-wrap gap-2">
+            {submittedProviders.map(p => (
+              <span key={p.label} className="rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 text-xs font-medium text-blue-400">
+                {p.label}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
-      {artistPress.map((p, i) => (
-        <a
-          key={`artist-${i}`}
-          href={p.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 transition-colors hover:border-gray-600"
-        >
-          <div>
-            <p className="font-medium text-white">{p.outlet}</p>
-            <p className="mt-0.5 text-xs text-gray-400">{p.title}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeColors[p.type]}`}>{p.type}</span>
-            <span className="text-gray-500">&rarr;</span>
-          </div>
-        </a>
-      ))}
+
+      {/* Lyrics content placeholder */}
+      <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
+        <div className="mb-4 text-4xl text-gray-700">&#127925;</div>
+        <p className="text-lg font-medium text-gray-400">
+          {song.lyrics_status === 'Written' ? 'Lyrics written but not yet added here.' : 'Lyrics not available yet.'}
+        </p>
+        <p className="mt-2 max-w-md text-sm text-gray-500">
+          Add a &quot;Lyrics&quot; text field in Notion to display full lyrics here, or connect a lyrics provider.
+        </p>
+      </div>
     </div>
   );
 }
@@ -764,16 +847,18 @@ function PressTab({ song }: { song: SongDetail }) {
 // --- Tab: Video ---
 function VideoTab({ song }: { song: SongDetail }) {
   const hasYouTube = !!song.youtube_link;
+  const youtubeId = hasYouTube ? extractYouTubeId(song.youtube_link!) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Official Video */}
       {hasYouTube && (
         <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">YouTube</h3>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Official Video</h3>
           <div className="aspect-video overflow-hidden rounded-lg bg-gray-900">
-            {song.youtube_link?.includes('youtu') ? (
+            {youtubeId ? (
               <iframe
-                src={`https://www.youtube.com/embed/${extractYouTubeId(song.youtube_link)}`}
+                src={`https://www.youtube.com/embed/${youtubeId}`}
                 className="h-full w-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -785,23 +870,43 @@ function VideoTab({ song }: { song: SongDetail }) {
               </a>
             )}
           </div>
+          <div className="mt-3 flex items-center gap-2">
+            <span className="rounded bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-300">YouTube</span>
+            <a href={song.youtube_link!} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-white truncate">
+              {song.youtube_link}
+            </a>
+          </div>
         </div>
       )}
 
-      {!hasYouTube && (
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
-          <p className="text-lg font-medium text-gray-400">No video content linked.</p>
-          <p className="mt-2 text-sm text-gray-500">Add video URLs in Notion to populate this section.</p>
-          <div className="mt-6 grid w-full max-w-md grid-cols-3 gap-3 opacity-30">
-            {['YouTube', 'Instagram', 'TikTok'].map(platform => (
-              <div key={platform} className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
-                <div className="mb-2 aspect-video rounded bg-gray-700" />
-                <p className="text-xs text-gray-500">{platform}</p>
+      {/* More Videos — UGC / Trending placeholder */}
+      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">More Videos</h3>
+          <div className="flex gap-1">
+            {['YouTube', 'Instagram', 'TikTok'].map(p => (
+              <span key={p} className="rounded bg-gray-700/50 px-2 py-0.5 text-[10px] text-gray-500">{p}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700/50 py-10 text-center">
+          <div className="mb-3 text-3xl text-gray-700">&#127909;</div>
+          <p className="text-sm font-medium text-gray-400">No additional video content linked yet.</p>
+          <p className="mt-1.5 max-w-md text-xs text-gray-500">
+            Instagram Reels, TikTok clips, and YouTube Shorts using this track will appear here when video URLs are added in Notion.
+          </p>
+          {/* Placeholder grid */}
+          <div className="mt-5 grid w-full max-w-lg grid-cols-3 gap-3 opacity-20">
+            {['Instagram Reel', 'TikTok', 'YouTube Short'].map(label => (
+              <div key={label} className="rounded-lg border border-gray-700 bg-gray-800/50 p-3">
+                <div className="mb-2 aspect-[9/16] rounded bg-gray-700" />
+                <p className="text-[10px] text-gray-500">{label}</p>
               </div>
             ))}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -812,7 +917,7 @@ function extractYouTubeId(url: string): string | null {
 }
 
 // --- Main Page ---
-const TABS = ['Overview', 'Rights', 'Collaborators', 'Revenue', 'Sync', 'Contracts', 'Press', 'Video'] as const;
+const TABS = ['Overview', 'Rights', 'Collaborators', 'Revenue', 'Sync', 'Contracts', 'Press', 'Lyrics', 'Video'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function SongDetailPage() {
@@ -909,6 +1014,7 @@ export default function SongDetailPage() {
         {activeTab === 'Sync' && <SyncTab song={song} />}
         {activeTab === 'Contracts' && <ContractsTab song={song} />}
         {activeTab === 'Press' && <PressTab song={song} />}
+        {activeTab === 'Lyrics' && <LyricsTab song={song} />}
         {activeTab === 'Video' && <VideoTab song={song} />}
       </div>
     </div>
