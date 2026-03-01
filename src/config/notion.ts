@@ -29,6 +29,53 @@ export const ARTIST_COLORS: Record<Artist, string> = {
   iLÜ: '#22C55E',
 };
 
+export const ARTIST_PROFILES: Record<Artist, {
+  photo: string;
+  subtitle: string;
+  dspLinks: {
+    spotify?: string;
+    appleMusic?: string;
+    youtubeMusic?: string;
+    amazonMusic?: string;
+    tidal?: string;
+    soundcloud?: string;
+  };
+}> = {
+  Jakke: {
+    photo: '/artists/jakke.jpg',
+    subtitle: 'Producer / Artist',
+    dspLinks: {
+      spotify: 'https://open.spotify.com/artist/PLACEHOLDER_JAKKE',
+      appleMusic: 'https://music.apple.com/artist/PLACEHOLDER_JAKKE',
+      youtubeMusic: 'https://music.youtube.com/channel/PLACEHOLDER_JAKKE',
+      amazonMusic: 'https://music.amazon.com/artists/PLACEHOLDER_JAKKE',
+      tidal: 'https://tidal.com/artist/PLACEHOLDER_JAKKE',
+      soundcloud: 'https://soundcloud.com/PLACEHOLDER_JAKKE',
+    },
+  },
+  Enjune: {
+    photo: '/artists/enjune.jpg',
+    subtitle: 'Artist / Writer',
+    dspLinks: {
+      spotify: 'https://open.spotify.com/artist/PLACEHOLDER_ENJUNE',
+      appleMusic: 'https://music.apple.com/artist/PLACEHOLDER_ENJUNE',
+      youtubeMusic: 'https://music.youtube.com/channel/PLACEHOLDER_ENJUNE',
+      amazonMusic: 'https://music.amazon.com/artists/PLACEHOLDER_ENJUNE',
+      tidal: 'https://tidal.com/artist/PLACEHOLDER_ENJUNE',
+      soundcloud: 'https://soundcloud.com/PLACEHOLDER_ENJUNE',
+    },
+  },
+  'iLÜ': {
+    photo: '/artists/ilu.jpg',
+    subtitle: 'Electronic / Experimental',
+    dspLinks: {
+      spotify: 'https://open.spotify.com/artist/PLACEHOLDER_ILU',
+      appleMusic: 'https://music.apple.com/artist/PLACEHOLDER_ILU',
+      youtubeMusic: 'https://music.youtube.com/channel/PLACEHOLDER_ILU',
+    },
+  },
+};
+
 /** Map lowercase URL param values to proper-cased artist names */
 export function parseArtistParam(raw: string | null | undefined): ArtistFilter {
   if (!raw || raw === 'all') return 'all';

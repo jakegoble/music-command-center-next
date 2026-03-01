@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArtistToggle } from './ArtistToggle';
 import { useArtistContext } from '@/lib/contexts/ArtistContext';
-import { ARTIST_COLORS, artistToParam, type Artist } from '@/config/notion';
+import { ARTIST_COLORS, ARTIST_PROFILES, artistToParam, type Artist } from '@/config/notion';
+import { DSP_ICONS, type DspKey } from './icons/DspIcons';
 
 const NAV_SECTIONS = [
   {
@@ -50,6 +52,9 @@ export function Sidebar() {
 
   const accentColor =
     artist !== 'all' ? ARTIST_COLORS[artist as Artist] : '#F97316';
+
+  const selectedProfile =
+    artist !== 'all' ? ARTIST_PROFILES[artist as Artist] : null;
 
   function buildHref(href: string) {
     if (artist === 'all') return href;
@@ -111,12 +116,60 @@ export function Sidebar() {
         </div>
 
         {/* Artist Toggle */}
-        <div className="px-4 py-3">
+        <div className="px-4 pt-3 pb-1">
           <ArtistToggle />
         </div>
 
+        {/* Artist Profile Card — shown when a specific artist is selected */}
+        {selectedProfile && (
+          <div className="mx-4 mt-2 mb-1 rounded-lg border border-gray-800 bg-gray-900/50 p-3">
+            <div className="flex items-center gap-3">
+              <div
+                className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full"
+                style={{ boxShadow: `0 0 0 2px ${accentColor}60` }}
+              >
+                <Image
+                  src={selectedProfile.photo}
+                  alt={artist as string}
+                  fill
+                  className="object-cover"
+                  sizes="48px"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{artist}</p>
+                <p className="text-[11px] text-gray-400">{selectedProfile.subtitle}</p>
+              </div>
+            </div>
+
+            {/* DSP Link Icons */}
+            <div className="mt-3 flex items-center gap-2">
+              {(Object.entries(selectedProfile.dspLinks) as [DspKey, string][]).map(([key, url]) => {
+                const dsp = DSP_ICONS[key];
+                if (!dsp || !url) return null;
+                const { Icon, label, hoverColor } = dsp;
+                return (
+                  <a
+                    key={key}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={label}
+                    className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-800"
+                    style={{ ['--dsp-hover' as string]: hoverColor }}
+                    onMouseEnter={(e) => { (e.currentTarget.firstElementChild as SVGElement).style.color = hoverColor; }}
+                    onMouseLeave={(e) => { (e.currentTarget.firstElementChild as SVGElement).style.color = ''; }}
+                  >
+                    <Icon size={18} />
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3">
+        <nav className="flex-1 overflow-y-auto px-3 pt-2">
           {NAV_SECTIONS.map((section) => (
             <div key={section.label} className="mb-4">
               <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
