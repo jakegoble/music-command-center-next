@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (match API response)
 // ---------------------------------------------------------------------------
 
 type EntityType = 'song' | 'collaborator' | 'royalty' | 'playlist' | 'licensing' | 'content';
@@ -39,20 +39,6 @@ interface AuditLogEntry {
   source: ChangeSource;
   timestamp: string;
 }
-
-const LS_CHANGES = 'mcc_pending_changes';
-const LS_AUDIT = 'mcc_audit_log';
-
-function loadChanges(): PendingChange[] {
-  if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localStorage.getItem(LS_CHANGES) ?? '[]'); } catch { return []; }
-}
-function saveChanges(c: PendingChange[]) { localStorage.setItem(LS_CHANGES, JSON.stringify(c)); }
-function loadAudit(): AuditLogEntry[] {
-  if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localStorage.getItem(LS_AUDIT) ?? '[]'); } catch { return []; }
-}
-function saveAudit(a: AuditLogEntry[]) { localStorage.setItem(LS_AUDIT, JSON.stringify(a)); }
 
 const ENTITY_COLORS: Record<EntityType, string> = {
   song: '#3B82F6',
@@ -89,7 +75,7 @@ function timeAgo(date: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Page: Queue or Audit Log
+// Page
 // ---------------------------------------------------------------------------
 
 const TABS = ['Queue', 'Audit Log'] as const;
@@ -99,14 +85,37 @@ export default function ApprovalsPage() {
   const [changes, setChanges] = useState<PendingChange[]>([]);
   const [audit, setAudit] = useState<AuditLogEntry[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('Queue');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  useEffect(() => {
-    setChanges(loadChanges());
-    setAudit(loadAudit());
+  const fetchData = useCallback(async () => {
+    try {
+      setError(null);
+      const [changesRes, auditRes] = await Promise.all([
+        fetch('/api/approvals'),
+        fetch('/api/approvals?view=audit'),
+      ]);
+
+      if (!changesRes.ok || !auditRes.ok) {
+        const errData = await (changesRes.ok ? auditRes : changesRes).json();
+        throw new Error(errData.details ?? errData.error ?? 'Failed to load');
+      }
+
+      const changesData = await changesRes.json();
+      const auditData = await auditRes.json();
+      setChanges(changesData.changes ?? []);
+      setAudit(auditData.entries ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
+  useEffect(() => { fetchData(); }, [fetchData]);
+
   const pending = changes.filter(c => c.status === 'pending');
-  const reviewed = changes.filter(c => c.status !== 'pending');
 
   // KPIs
   const now = new Date();
@@ -118,61 +127,63 @@ export default function ApprovalsPage() {
   const approvedThisWeek = changes.filter(c => c.status === 'approved' && c.reviewedAt && new Date(c.reviewedAt) >= weekAgo).length;
   const rejectionRate = (approvedThisWeek + rejectedThisWeek) > 0 ? Math.round((rejectedThisWeek / (approvedThisWeek + rejectedThisWeek)) * 100) : 0;
 
-  const handleAction = useCallback((id: string, action: 'approved' | 'rejected') => {
-    const reviewedAt = new Date().toISOString();
-    const updated = changes.map(c => c.id === id ? { ...c, status: action as ChangeStatus, reviewedAt } : c);
-    setChanges(updated);
-    saveChanges(updated);
+  const handleAction = useCallback(async (id: string, status: 'approved' | 'rejected') => {
+    setActionInProgress(id);
+    try {
+      const res = await fetch(`/api/approvals/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('Update failed');
+      await fetchData();
+    } catch {
+      setError('Failed to update approval');
+    } finally {
+      setActionInProgress(null);
+    }
+  }, [fetchData]);
 
-    const change = changes.find(c => c.id === id)!;
-    const entry: AuditLogEntry = {
-      id: `audit_${Date.now()}`,
-      entityType: change.entityType,
-      entityLabel: change.entityLabel,
-      action: action === 'approved' ? 'approve' : 'reject',
-      fieldName: change.fieldName,
-      previousValue: change.currentValue,
-      newValue: change.proposedValue,
-      source: change.source,
-      timestamp: reviewedAt,
-    };
-    const newAudit = [entry, ...audit];
-    setAudit(newAudit);
-    saveAudit(newAudit);
-  }, [changes, audit]);
+  const approveAllHighConfidence = useCallback(async () => {
+    const highConfIds = pending.filter(c => c.confidence === 'high').map(c => c.id);
+    if (highConfIds.length === 0) return;
 
-  const approveAllHighConfidence = useCallback(() => {
-    const reviewedAt = new Date().toISOString();
-    const newAuditEntries: AuditLogEntry[] = [];
-    const updated = changes.map(c => {
-      if (c.status === 'pending' && c.confidence === 'high') {
-        newAuditEntries.push({
-          id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          entityType: c.entityType,
-          entityLabel: c.entityLabel,
-          action: 'auto_approve',
-          fieldName: c.fieldName,
-          previousValue: c.currentValue,
-          newValue: c.proposedValue,
-          source: c.source,
-          timestamp: reviewedAt,
-        });
-        return { ...c, status: 'auto_approved' as ChangeStatus, reviewedAt };
-      }
-      return c;
-    });
-    setChanges(updated);
-    saveChanges(updated);
-    const newAudit = [...newAuditEntries, ...audit];
-    setAudit(newAudit);
-    saveAudit(newAudit);
-  }, [changes, audit]);
+    setActionInProgress('batch');
+    try {
+      const res = await fetch('/api/approvals/batch', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: highConfIds, status: 'auto_approved' }),
+      });
+      if (!res.ok) throw new Error('Batch update failed');
+      await fetchData();
+    } catch {
+      setError('Failed to batch approve');
+    } finally {
+      setActionInProgress(null);
+    }
+  }, [pending, fetchData]);
 
   // Group pending by entity type
   const grouped: Record<string, PendingChange[]> = {};
   for (const c of pending) {
     if (!grouped[c.entityType]) grouped[c.entityType] = [];
     grouped[c.entityType].push(c);
+  }
+
+  if (error?.includes('not configured')) {
+    return (
+      <div>
+        <PageHeader title="Approvals" />
+        <div className="mt-6 rounded-xl border border-dashed border-amber-700/50 bg-amber-950/20 p-6 text-center">
+          <p className="text-lg font-medium text-amber-400">Approval Queue Not Configured</p>
+          <p className="mt-2 text-sm text-gray-400">
+            Create an &quot;Approval Queue&quot; database in Notion with the required properties,
+            then set the <code className="rounded bg-gray-800 px-1.5 py-0.5 text-xs text-amber-300">NOTION_APPROVAL_QUEUE_DB</code> environment variable.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -182,10 +193,10 @@ export default function ApprovalsPage() {
       {/* KPIs */}
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { label: 'Pending', value: pending.length.toString(), color: 'text-amber-400', border: 'border-l-amber-500' },
-          { label: 'Auto-Approved (Week)', value: autoApprovedThisWeek.toString(), color: 'text-green-400', border: 'border-l-green-500' },
-          { label: 'Reviewed Today', value: reviewedToday.toString(), color: 'text-blue-400', border: 'border-l-blue-500' },
-          { label: 'Rejection Rate', value: `${rejectionRate}%`, color: 'text-red-400', border: 'border-l-red-500' },
+          { label: 'Pending', value: isLoading ? '...' : pending.length.toString(), color: 'text-amber-400', border: 'border-l-amber-500' },
+          { label: 'Auto-Approved (Week)', value: isLoading ? '...' : autoApprovedThisWeek.toString(), color: 'text-green-400', border: 'border-l-green-500' },
+          { label: 'Reviewed Today', value: isLoading ? '...' : reviewedToday.toString(), color: 'text-blue-400', border: 'border-l-blue-500' },
+          { label: 'Rejection Rate', value: isLoading ? '...' : `${rejectionRate}%`, color: 'text-red-400', border: 'border-l-red-500' },
         ].map(kpi => (
           <div key={kpi.label} className={`rounded-xl border border-gray-700/50 border-l-4 ${kpi.border} bg-gray-800/50 p-4`}>
             <p className="text-xs font-medium uppercase tracking-wider text-gray-500">{kpi.label}</p>
@@ -193,6 +204,11 @@ export default function ApprovalsPage() {
           </div>
         ))}
       </div>
+
+      {/* Error */}
+      {error && !error.includes('not configured') && (
+        <div className="mt-4 rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm text-red-300">{error}</div>
+      )}
 
       {/* Tabs */}
       <div className="mt-6 flex gap-1 border-b border-gray-800">
@@ -212,7 +228,13 @@ export default function ApprovalsPage() {
         ))}
       </div>
 
-      {activeTab === 'Queue' ? (
+      {isLoading ? (
+        <div className="mt-6 space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-800/50" />
+          ))}
+        </div>
+      ) : activeTab === 'Queue' ? (
         <div className="mt-6">
           {pending.length === 0 ? (
             <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
@@ -221,17 +243,16 @@ export default function ApprovalsPage() {
             </div>
           ) : (
             <>
-              {/* Batch Action */}
               {pending.some(c => c.confidence === 'high') && (
                 <button
                   onClick={approveAllHighConfidence}
-                  className="mb-4 rounded-lg bg-green-900/30 border border-green-800/50 px-4 py-2 text-sm font-medium text-green-300 hover:bg-green-900/50"
+                  disabled={actionInProgress === 'batch'}
+                  className="mb-4 rounded-lg bg-green-900/30 border border-green-800/50 px-4 py-2 text-sm font-medium text-green-300 hover:bg-green-900/50 disabled:opacity-50"
                 >
-                  Approve All High-Confidence ({pending.filter(c => c.confidence === 'high').length})
+                  {actionInProgress === 'batch' ? 'Approving...' : `Approve All High-Confidence (${pending.filter(c => c.confidence === 'high').length})`}
                 </button>
               )}
 
-              {/* Grouped Changes */}
               {Object.entries(grouped).map(([entityType, items]) => (
                 <div key={entityType} className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
@@ -266,15 +287,17 @@ export default function ApprovalsPage() {
                         <div className="flex shrink-0 gap-1.5">
                           <button
                             onClick={() => handleAction(change.id, 'approved')}
-                            className="rounded-lg bg-green-900/30 px-3 py-1.5 text-xs font-medium text-green-300 hover:bg-green-900/50"
+                            disabled={actionInProgress === change.id}
+                            className="rounded-lg bg-green-900/30 px-3 py-1.5 text-xs font-medium text-green-300 hover:bg-green-900/50 disabled:opacity-50"
                           >
-                            Approve
+                            {actionInProgress === change.id ? '...' : 'Approve'}
                           </button>
                           <button
                             onClick={() => handleAction(change.id, 'rejected')}
-                            className="rounded-lg bg-red-900/30 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-900/50"
+                            disabled={actionInProgress === change.id}
+                            className="rounded-lg bg-red-900/30 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-900/50 disabled:opacity-50"
                           >
-                            Reject
+                            {actionInProgress === change.id ? '...' : 'Reject'}
                           </button>
                         </div>
                       </div>
@@ -286,7 +309,6 @@ export default function ApprovalsPage() {
           )}
         </div>
       ) : (
-        /* Audit Log */
         <div className="mt-6">
           {audit.length === 0 ? (
             <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">

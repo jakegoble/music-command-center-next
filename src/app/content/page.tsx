@@ -2,34 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import type { ContentProject, ContentType, ContentStage } from '@/lib/services/content-pipeline';
 
 // ---------------------------------------------------------------------------
-// Types
+// Constants
 // ---------------------------------------------------------------------------
-
-type ContentType = 'youtube_video' | 'youtube_short' | 'instagram_reel' | 'instagram_post' | 'instagram_story' | 'tiktok' | 'blog_post' | 'press_release' | 'other';
-type ContentStage = 'idea' | 'production' | 'mastering' | 'scheduled' | 'published' | 'promoted';
-
-interface ChecklistItem {
-  id: string;
-  stepName: string;
-  isComplete: boolean;
-}
-
-interface ContentProject {
-  id: string;
-  title: string;
-  type: ContentType;
-  stage: ContentStage;
-  checklist: ChecklistItem[];
-  publishDate: string | null;
-  assignedTo: string | null;
-  notes: string | null;
-  views: number | null;
-  likes: number | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 const STAGES: { key: ContentStage; label: string; color: string }[] = [
   { key: 'idea', label: 'Idea', color: '#9CA3AF' },
@@ -52,52 +29,34 @@ const TYPE_LABELS: Record<ContentType, string> = {
   other: 'Other',
 };
 
-const DEFAULT_CHECKLISTS: Record<ContentType, string[]> = {
-  youtube_video: ['Concept & outline', 'Script/storyboard', 'Film A-roll', 'Film B-roll', 'Edit video', 'Color grade', 'Add music/SFX', 'Create thumbnail', 'Write title & description', 'Add tags & cards', 'Schedule upload', 'Promote on socials'],
-  youtube_short: ['Concept', 'Film clip', 'Edit (< 60s)', 'Add caption/text', 'Upload', 'Cross-post'],
-  instagram_reel: ['Concept', 'Film content', 'Edit in app', 'Write caption', 'Select audio', 'Add hashtags', 'Schedule/post'],
-  instagram_post: ['Concept', 'Create visual', 'Write caption', 'Add hashtags', 'Schedule/post'],
-  instagram_story: ['Create content', 'Add stickers/links', 'Post', 'Save to highlights'],
-  tiktok: ['Concept', 'Film content', 'Edit with effects', 'Write caption', 'Add sounds/hashtags', 'Post'],
-  blog_post: ['Topic research', 'Outline', 'First draft', 'Edit/revise', 'Add images', 'SEO optimization', 'Publish', 'Promote'],
-  press_release: ['Draft release', 'Internal review', 'Media list', 'Send to contacts', 'Follow up', 'Track coverage', 'Archive'],
-  other: ['Plan', 'Create', 'Review', 'Publish'],
-};
-
-const LS_KEY = 'mcc_content_projects';
-
-function loadProjects(): ContentProject[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const data = localStorage.getItem(LS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch { return []; }
-}
-
-function saveProjects(projects: ContentProject[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(projects));
-}
-
-function genId(): string {
-  return `cp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export default function ContentPipelinePage() {
   const [projects, setProjects] = useState<ContentProject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notConfigured, setNotConfigured] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [actionInProgress, setActionInProgress] = useState(false);
 
-  useEffect(() => { setProjects(loadProjects()); }, []);
-
-  const save = useCallback((updated: ContentProject[]) => {
-    setProjects(updated);
-    saveProjects(updated);
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/content');
+      if (res.status === 503) { setNotConfigured(true); setIsLoading(false); return; }
+      const json = await res.json();
+      setProjects(json.projects ?? []);
+      setNotConfigured(false);
+    } catch {
+      setProjects([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   // KPIs
   const active = projects.filter(p => !['published', 'promoted'].includes(p.stage)).length;
@@ -105,53 +64,98 @@ export default function ContentPipelinePage() {
   const scheduled = projects.filter(p => p.stage === 'scheduled').length;
   const totalViews = projects.reduce((sum, p) => sum + (p.views ?? 0), 0);
 
-  function handleCreate(title: string, type: ContentType) {
-    const now = new Date().toISOString();
-    const checklist = (DEFAULT_CHECKLISTS[type] ?? DEFAULT_CHECKLISTS.other).map((step, i) => ({
-      id: `step_${i}`,
-      stepName: step,
-      isComplete: false,
-    }));
-    const project: ContentProject = {
-      id: genId(),
-      title,
-      type,
-      stage: 'idea',
-      checklist,
-      publishDate: null,
-      assignedTo: null,
-      notes: null,
-      views: null,
-      likes: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    save([...projects, project]);
-    setShowForm(false);
+  async function handleCreate(title: string, type: ContentType) {
+    setActionInProgress(true);
+    try {
+      await fetch('/api/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, type }),
+      });
+      await fetchData();
+      setShowForm(false);
+    } finally {
+      setActionInProgress(false);
+    }
   }
 
-  function handleDrop(stage: ContentStage) {
+  async function handleDrop(stage: ContentStage) {
     if (!dragId) return;
-    const updated = projects.map(p => p.id === dragId ? { ...p, stage, updatedAt: new Date().toISOString() } : p);
-    save(updated);
-    setDragId(null);
+    setActionInProgress(true);
+    try {
+      await fetch(`/api/content/${dragId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage }),
+      });
+      await fetchData();
+      setDragId(null);
+    } finally {
+      setActionInProgress(false);
+    }
   }
 
-  function toggleChecklistItem(projectId: string, itemId: string) {
-    const updated = projects.map(p => {
-      if (p.id !== projectId) return p;
-      return {
-        ...p,
-        checklist: p.checklist.map(c => c.id === itemId ? { ...c, isComplete: !c.isComplete } : c),
-        updatedAt: new Date().toISOString(),
-      };
-    });
-    save(updated);
+  async function toggleChecklistItem(projectId: string, itemId: string) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    const item = project.checklist.find(c => c.id === itemId);
+    if (!item) return;
+    setActionInProgress(true);
+    try {
+      await fetch(`/api/content/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle_checklist', itemId, isComplete: !item.isComplete }),
+      });
+      await fetchData();
+    } finally {
+      setActionInProgress(false);
+    }
   }
 
-  function deleteProject(id: string) {
-    save(projects.filter(p => p.id !== id));
-    setEditId(null);
+  async function handleDeleteProject(id: string) {
+    setActionInProgress(true);
+    try {
+      await fetch(`/api/content/${id}`, { method: 'DELETE' });
+      await fetchData();
+      setEditId(null);
+    } finally {
+      setActionInProgress(false);
+    }
+  }
+
+  // Not-configured state
+  if (notConfigured) {
+    return (
+      <div>
+        <PageHeader title="Content Pipeline" />
+        <div className="mt-8 rounded-xl border border-amber-700/50 bg-amber-950/20 p-6 text-center">
+          <p className="text-amber-400 font-medium">Content Pipeline database not configured</p>
+          <p className="mt-2 text-sm text-gray-400">
+            Set the <code className="rounded bg-gray-800 px-1.5 py-0.5 text-xs text-amber-300">NOTION_CONTENT_PIPELINE_DB</code> environment variable to your Notion database ID.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div>
+        <PageHeader title="Content Pipeline" />
+        <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-800/50" />
+          ))}
+        </div>
+        <div className="mt-4 flex gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-48 w-52 animate-pulse rounded-xl bg-gray-800/50" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -177,14 +181,15 @@ export default function ContentPipelinePage() {
       <div className="mt-4 flex justify-end">
         <button
           onClick={() => setShowForm(true)}
-          className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500"
+          disabled={actionInProgress}
+          className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 disabled:opacity-50"
         >
           + New Project
         </button>
       </div>
 
       {/* Create Form Modal */}
-      {showForm && <CreateForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />}
+      {showForm && <CreateForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} disabled={actionInProgress} />}
 
       {/* Detail Panel */}
       {editId && (() => {
@@ -195,7 +200,8 @@ export default function ContentPipelinePage() {
             project={project}
             onClose={() => setEditId(null)}
             onToggleCheck={(itemId) => toggleChecklistItem(editId, itemId)}
-            onDelete={() => deleteProject(editId)}
+            onDelete={() => handleDeleteProject(editId)}
+            disabled={actionInProgress}
           />
         );
       })()}
@@ -261,7 +267,7 @@ export default function ContentPipelinePage() {
 // Create Form
 // ---------------------------------------------------------------------------
 
-function CreateForm({ onSubmit, onCancel }: { onSubmit: (title: string, type: ContentType) => void; onCancel: () => void }) {
+function CreateForm({ onSubmit, onCancel, disabled }: { onSubmit: (title: string, type: ContentType) => void; onCancel: () => void; disabled: boolean }) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<ContentType>('youtube_video');
 
@@ -297,10 +303,10 @@ function CreateForm({ onSubmit, onCancel }: { onSubmit: (title: string, type: Co
           <button onClick={onCancel} className="rounded-lg px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
           <button
             onClick={() => { if (title.trim()) onSubmit(title.trim(), type); }}
-            disabled={!title.trim()}
+            disabled={!title.trim() || disabled}
             className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 disabled:opacity-50"
           >
-            Create
+            {disabled ? 'Creating...' : 'Create'}
           </button>
         </div>
       </div>
@@ -317,11 +323,13 @@ function DetailPanel({
   onClose,
   onToggleCheck,
   onDelete,
+  disabled,
 }: {
   project: ContentProject;
   onClose: () => void;
   onToggleCheck: (itemId: string) => void;
   onDelete: () => void;
+  disabled: boolean;
 }) {
   const stage = STAGES.find(s => s.key === project.stage);
   const done = project.checklist.filter(c => c.isComplete).length;
@@ -360,7 +368,8 @@ function DetailPanel({
               <button
                 key={item.id}
                 onClick={() => onToggleCheck(item.id)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-gray-800"
+                disabled={disabled}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-gray-800 disabled:opacity-50"
               >
                 <span className={`inline-flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
                   item.isComplete ? 'border-green-500 bg-green-900/50 text-green-400' : 'border-gray-600 text-gray-600'
@@ -396,8 +405,12 @@ function DetailPanel({
 
         {/* Delete */}
         <div className="mt-8 border-t border-gray-800 pt-4">
-          <button onClick={onDelete} className="rounded-lg border border-red-800 bg-red-950/30 px-4 py-2 text-sm text-red-400 hover:bg-red-950/50">
-            Delete Project
+          <button
+            onClick={onDelete}
+            disabled={disabled}
+            className="rounded-lg border border-red-800 bg-red-950/30 px-4 py-2 text-sm text-red-400 hover:bg-red-950/50 disabled:opacity-50"
+          >
+            {disabled ? 'Deleting...' : 'Delete Project'}
           </button>
         </div>
       </div>
