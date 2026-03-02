@@ -27,7 +27,8 @@ export function generateHighlights(song: SongDetail): string[] {
   const streamChip = formatStreamMilestone(song.total_streams);
   if (streamChip) highlights.push(streamChip);
 
-  if (song.parsed_notes?.label_info) highlights.push(song.parsed_notes.label_info);
+  const labelChip = song.parsed_notes?.label_info;
+  if (labelChip && labelChip.length < 60) highlights.push(labelChip);
   else if (song.distributor) highlights.push(song.distributor);
 
   if (song.sync_available && song.sync_tier) highlights.push(`Sync ${song.sync_tier}`);
@@ -85,7 +86,8 @@ export function generateTrackDescription(song: SongDetail): string | null {
   }
   if (song.distributor) {
     const labelInfo = song.parsed_notes?.label_info;
-    if (labelInfo && labelInfo !== song.distributor) {
+    // Guard: label_info over 60 chars is likely polluted with extra data
+    if (labelInfo && labelInfo !== song.distributor && labelInfo.length < 60) {
       contextParts.push(`distributed through ${song.distributor} via ${labelInfo}`);
     } else {
       contextParts.push(`distributed through ${song.distributor}`);

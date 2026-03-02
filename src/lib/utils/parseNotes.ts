@@ -49,44 +49,59 @@ export function parseNotes(raw: string | null): ParsedNotes | null {
   }
   text = text.replace(upcRe, '');
 
-  // Extract label info
-  const labelRe = /(?:LABEL(?:\s*RELEASE)?|Label|Distributed\s+by|Distribution)\s*:\s*([^\n|]+)/gi;
-  const labelMatch = labelRe.exec(raw);
-  if (labelMatch) {
-    labelInfo = labelMatch[1].trim();
-    text = text.replace(labelMatch[0], '');
-  }
-
-  // Extract track listings — "Contains: 1. Track Name, 2. Track Name, ..."
-  const containsRe = /Contains\s*:\s*((?:\d+\.\s*[^,\n]+(?:,\s*)?)+)/gi;
+  // Extract track listings FIRST — "Contains: 1. Track Name ISRC, 2. Track Name ISRC, ..."
+  // Must run before label extraction since label regex can over-capture into Contains section
+  const containsRe = /Contains\s*:\s*([\s\S]*?)(?=\.\s*(?:Has |Splits?\s|$)|\s*$)/gi;
   const containsMatch = containsRe.exec(text);
   if (containsMatch) {
     const trackStr = containsMatch[1];
+    // Split on numbered entries: "1. Track, 2. Track, ..."
     const trackEntries = trackStr.split(/,\s*(?=\d+\.)/).map(t => t.trim()).filter(Boolean);
     for (const entry of trackEntries) {
-      // Strip leading "1. " numbering and trailing ISRC-like codes
-      const cleaned = entry.replace(/^\d+\.\s*/, '').replace(/\s+[A-Z]{2}[A-Z0-9]{3}\d{7}\s*$/, '').trim();
+      // Strip leading "1. " numbering, trailing ISRC codes, and trailing periods
+      const cleaned = entry
+        .replace(/^\d+\.\s*/, '')
+        .replace(/\s+[A-Z]{2}[A-Z0-9]{3}\d{5,7}\s*$/, '')
+        .replace(/\.\s*$/, '')
+        .trim();
       if (cleaned) trackListing.push(cleaned);
     }
     text = text.replace(containsMatch[0], '');
   }
 
-  // Extract "Splits with:" or "Splits:" sections
-  const splitsRe = /Splits?\s+with\s*:\s*([^\n.]+(?:[^\n]*@[^\n]+)*)/gi;
-  const splitsMatch = splitsRe.exec(text);
-  if (splitsMatch) {
-    splitsInfo = splitsMatch[1].trim();
-    text = text.replace(splitsMatch[0], '');
-  }
+  // Extract "Splits with:" or "Splits:" sections (remove entirely — data is in emails array)
+  const splitsRe = /Splits?\s+with\s*:\s*[^\n]*/gi;
+  text = text.replace(splitsRe, '');
 
   // Strip "Has Discovery Pack" and similar metadata flags
   text = text.replace(/Has\s+Discovery\s+Pack\.?/gi, '');
 
-  // Clean up remaining text
+  // Extract label info — stop at period, comma, or "Contains"
+  const labelRe = /(?:Record\s+)?(?:LABEL(?:\s*RELEASE)?|Label)\s*:\s*([^.,\n]+)/gi;
+  const labelMatch = labelRe.exec(text);
+  if (labelMatch) {
+    labelInfo = labelMatch[1].trim();
+    text = text.replace(labelMatch[0], '');
+  }
+  if (!labelInfo) {
+    const distRe = /(?:Distributed\s+by|Distribution)\s*:\s*([^.,\n]+)/gi;
+    const distMatch = distRe.exec(text);
+    if (distMatch) {
+      labelInfo = distMatch[1].trim();
+      text = text.replace(distMatch[0], '');
+    }
+  }
+
+  // Clean up remaining text — strip metadata fragments
   text = text
     .replace(/ISRC\s*:/gi, '')
+    .replace(/UPC\s*:\s*\d{12,13}/gi, '')
     .replace(/UPC\s*:/gi, '')
+    .replace(/\d+-track\s+(?:album|EP|single|collection)\.?/gi, '')
+    .replace(/Released\s+[A-Za-z]+\s+\d{1,2},?\s*\d{4}\.?/gi, '')
+    .replace(/Record\s+Label\s*:/gi, '')
     .replace(/\|/g, ' ')
+    .replace(/\s*-\s*(?=\s|$)/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .replace(/^\s*[,;.\-]\s*/gm, '')
     .trim();

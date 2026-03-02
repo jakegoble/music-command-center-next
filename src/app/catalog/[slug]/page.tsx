@@ -178,7 +178,7 @@ function OverviewTab({ song }: { song: SongDetail }) {
         {(song.distributor || song.parsed_notes?.label_info || song.release_date) && (
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t border-gray-700/30 pt-3 text-xs text-gray-500">
             {song.distributor && <span>Distributor: <span className="text-gray-300">{song.distributor}</span></span>}
-            {song.parsed_notes?.label_info && <span>Label: <span className="text-gray-300">{song.parsed_notes.label_info}</span></span>}
+            {song.parsed_notes?.label_info && song.parsed_notes.label_info.length < 60 && <span>Label: <span className="text-gray-300">{song.parsed_notes.label_info}</span></span>}
             {song.release_date && <span>Released: <span className="text-gray-300">{song.release_date}</span></span>}
           </div>
         )}
@@ -194,7 +194,7 @@ function OverviewTab({ song }: { song: SongDetail }) {
               { label: 'Distributor', value: song.distributor },
               { label: 'Album / EP', value: song.album_ep },
               { label: 'Status', value: song.status },
-              { label: 'Label', value: song.parsed_notes?.label_info },
+              { label: 'Label', value: (song.parsed_notes?.label_info && song.parsed_notes.label_info.length < 60) ? song.parsed_notes.label_info : null },
               { label: 'Producers', value: song.producers },
               { label: 'Songwriters', value: song.songwriters },
             ] as { label: string; value: string | null | undefined }[]).map(({ label, value }) => (
