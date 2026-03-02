@@ -20,6 +20,13 @@ function formatCurrency(n: number): string {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function isCollection(song: SongDetail): boolean {
+  const trackCount = song.parsed_notes?.track_listing?.length ?? 0;
+  if (trackCount > 1) return true;
+  const lower = song.title.toLowerCase();
+  return lower.includes('remixes') || lower.includes('remix ep') || lower.includes('remix pack');
+}
+
 function CheckIcon({ checked }: { checked: boolean }) {
   return checked
     ? <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-900/50 text-xs text-green-400">&#10003;</span>
@@ -106,6 +113,73 @@ function SongHero({ song }: { song: SongDetail }) {
             <span className="text-2xl font-bold text-white">
               {song.total_streams > 0 ? `${formatNumber(song.total_streams)} streams` : '\u2014'}
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* DSP Links */}
+      {(song.spotify_link || song.apple_music_link || song.youtube_link) && (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-700/50 pt-4">
+          {song.spotify_link && (
+            <a href={song.spotify_link} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-green-900/30 px-4 py-2 text-xs font-medium text-green-300 transition-colors hover:bg-green-900/50">Spotify</a>
+          )}
+          {song.apple_music_link && (
+            <a href={song.apple_music_link} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-pink-900/30 px-4 py-2 text-xs font-medium text-pink-300 transition-colors hover:bg-pink-900/50">Apple Music</a>
+          )}
+          {song.youtube_link && (
+            <a href={song.youtube_link} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-red-900/30 px-4 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-900/50">YouTube</a>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Collection Hero ---
+function CollectionHero({ song }: { song: SongDetail }) {
+  const color = song.artist ? (ARTIST_COLORS[song.artist as Artist] ?? '#6b7280') : '#6b7280';
+  const initials = song.title.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const trackCount = song.parsed_notes?.track_listing?.length ?? 0;
+
+  return (
+    <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-6">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+        {/* Artwork */}
+        {song.artwork_url ? (
+          <div className="h-[200px] w-[200px] shrink-0 overflow-hidden rounded-xl shadow-lg md:h-[250px] md:w-[250px]">
+            <img src={song.artwork_url} alt={song.title} className="h-full w-full object-cover" />
+          </div>
+        ) : (
+          <div className="flex h-[200px] w-[200px] shrink-0 items-center justify-center rounded-xl shadow-lg md:h-[250px] md:w-[250px]" style={{ background: `linear-gradient(135deg, ${color}44, ${color}11)` }}>
+            <span className="text-6xl font-bold" style={{ color }}>{initials}</span>
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <h2 className="text-3xl font-bold text-white">{song.title}</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: color }}>{song.artist}</span>
+            <span className="rounded-full bg-blue-900/50 px-2.5 py-0.5 text-xs font-medium text-blue-300">
+              {trackCount > 1 ? 'Remix Collection' : 'EP'}
+            </span>
+            {trackCount > 0 && (
+              <span className="rounded-full bg-gray-700/50 px-2.5 py-0.5 text-xs font-medium text-gray-300">{trackCount} Tracks</span>
+            )}
+          </div>
+
+          {/* Metadata line */}
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-400">
+            {song.release_date && <span>{song.release_date}</span>}
+            {song.distributor && <span>by {song.distributor}</span>}
+            {song.parsed_notes?.label_info && song.parsed_notes.label_info.length < 60 && <span>{song.parsed_notes.label_info}</span>}
+          </div>
+
+          {/* Total streams as big number */}
+          <div className="mt-4">
+            <span className="text-3xl font-bold text-white">
+              {song.total_streams > 0 ? formatNumber(song.total_streams) : '—'}
+            </span>
+            <span className="ml-2 text-gray-400">streams</span>
           </div>
         </div>
       </div>
@@ -331,6 +405,135 @@ function OverviewTab({ song }: { song: SongDetail }) {
       </div>
 
       {/* Publishing / Ownership */}
+      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Publishing & Ownership</h3>
+        <dl className="space-y-2">
+          {([
+            { label: 'Publisher', value: song.publisher },
+            { label: 'Master Ownership', value: song.master_ownership },
+          ] as { label: string; value: string | null }[]).map(({ label, value }) => (
+            <div key={label} className="flex justify-between">
+              <dt className="text-sm text-gray-500">{label}</dt>
+              <dd className="text-sm text-white">{value ?? '\u2014'}</dd>
+            </div>
+          ))}
+        </dl>
+        {song.writer_splits_parsed.length > 0 && (
+          <>
+            <h4 className="mb-2 mt-4 text-xs font-semibold uppercase text-gray-400">Writer Splits</h4>
+            <div className="space-y-1">
+              {song.writer_splits_parsed.map((s, i) => (
+                <div key={i} className="flex items-center justify-between rounded bg-gray-900/50 px-2 py-1">
+                  <span className="text-xs text-gray-300">{s.name}</span>
+                  <span className="text-xs font-medium text-white">{s.percentage}%</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Tab: Collection Overview ---
+function CollectionOverviewTab({ song }: { song: SongDetail }) {
+  const descriptionText = song.story_description
+    ?? song.generated_description
+    ?? song.parsed_notes?.description
+    ?? null;
+  const artistColor = ARTIST_COLORS[song.artist as Artist] ?? '#F97316';
+  const trackCount = song.parsed_notes?.track_listing?.length ?? 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Tracklist — at the top */}
+      {song.parsed_notes?.track_listing && song.parsed_notes.track_listing.length > 0 && (
+        <div>
+          <h2 className="mb-3 text-lg font-semibold text-white">Tracklist</h2>
+          <div className="overflow-x-auto rounded-xl border border-gray-700/50 bg-gray-800/50">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-xs uppercase tracking-wider text-gray-500">
+                  <th className="px-3 py-3 w-8">#</th>
+                  <th className="px-3 py-3">Title</th>
+                </tr>
+              </thead>
+              <tbody>
+                {song.parsed_notes.track_listing.map((track, i) => (
+                  <tr key={i} className="border-b border-gray-800/50 transition-colors hover:bg-gray-800/30">
+                    <td className="px-3 py-3 text-gray-500 font-medium">{i + 1}</td>
+                    <td className="px-3 py-3 text-gray-200">{track}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* About section */}
+      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-6" style={{ borderLeftWidth: 4, borderLeftColor: artistColor }}>
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">About</h3>
+        {descriptionText ? (
+          <p className="text-base leading-relaxed text-gray-200">{descriptionText}</p>
+        ) : (
+          <p className="text-sm italic text-gray-500">No story written yet. Add a description in Notion to bring this section to life.</p>
+        )}
+
+        {/* Highlights */}
+        {song.highlights.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {song.highlights.map(h => (
+              <span key={h} className="rounded-full px-3 py-1 text-xs font-medium" style={{ backgroundColor: `${artistColor}18`, color: artistColor, border: `1px solid ${artistColor}40` }}>
+                {h}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: 'Total Streams', value: formatNumber(song.total_streams) },
+          { label: 'Track Count', value: trackCount.toString() },
+          { label: 'Est. Revenue', value: formatCurrency(song.estimated_revenue) },
+          { label: 'BPM / Key', value: song.bpm ? `${song.bpm}${song.key ? ` / ${song.key}` : ''}` : '\u2014' },
+        ].map(stat => (
+          <div key={stat.label} className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-4">
+            <p className="text-xs text-gray-500">{stat.label}</p>
+            <p className="mt-1 text-xl font-bold text-white">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Deliverables Grid */}
+      <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Deliverables</h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+          {[
+            { label: 'Stereo Master', checked: song.has_stereo_master },
+            { label: 'Instrumental', checked: song.has_instrumental },
+            { label: 'Acapella', checked: song.has_acapella },
+            { label: 'Stems', checked: song.stems_complete },
+            { label: '15s Edit', checked: song.has_15s_edit },
+            { label: '30s Edit', checked: song.has_30s_edit },
+            { label: '60s Edit', checked: song.has_60s_edit },
+            { label: 'Atmos Mix', checked: song.atmos_mix },
+            { label: '360RA', checked: song.has_360ra },
+            { label: 'Project File', checked: song.has_project_file },
+            { label: 'Artwork', checked: song.artwork },
+          ].map(({ label, checked }) => (
+            <div key={label} className="flex items-center gap-2 rounded-lg bg-gray-900/50 px-3 py-2">
+              <CheckIcon checked={checked} />
+              <span className="text-xs text-gray-300">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Publishing & Ownership */}
       <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Publishing & Ownership</h3>
         <dl className="space-y-2">
@@ -1149,7 +1352,7 @@ export default function SongDetailPage() {
         <Link href={artist !== 'all' ? `/catalog?artist=${artistToParam(artist)}` : '/catalog'} className="text-sm text-gray-400 hover:text-white">&larr; Back to Catalog</Link>
       </div>
 
-      <SongHero song={song} />
+      {isCollection(song) ? <CollectionHero song={song} /> : <SongHero song={song} />}
 
       {/* Tabs */}
       <div className="mt-6 -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
@@ -1171,7 +1374,7 @@ export default function SongDetailPage() {
       </div>
 
       <div className="mt-6">
-        {activeTab === 'Overview' && <OverviewTab song={song} />}
+        {activeTab === 'Overview' && (isCollection(song) ? <CollectionOverviewTab song={song} /> : <OverviewTab song={song} />)}
         {activeTab === 'Rights' && <RightsTab song={song} />}
         {activeTab === 'Collaborators' && <CollaboratorsTab song={song} />}
         {activeTab === 'Revenue' && <RevenueTab song={song} />}
