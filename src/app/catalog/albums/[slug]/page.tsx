@@ -77,12 +77,18 @@ export default function AlbumDetailPage() {
 
       {/* Album Hero */}
       <div className="mt-4 flex flex-col gap-5 rounded-xl border border-gray-700/50 bg-gray-800/50 p-6 sm:flex-row">
-        <div
-          className="flex h-[150px] w-[150px] shrink-0 items-center justify-center rounded-xl"
-          style={{ background: `linear-gradient(135deg, ${color}55, ${color}11)` }}
-        >
-          <span className="text-4xl font-bold" style={{ color }}>{album.name.charAt(0)}</span>
-        </div>
+        {album.artwork_url ? (
+          <div className="h-[150px] w-[150px] shrink-0 overflow-hidden rounded-xl shadow-lg">
+            <img src={album.artwork_url} alt={album.name} className="h-full w-full object-cover" />
+          </div>
+        ) : (
+          <div
+            className="flex h-[150px] w-[150px] shrink-0 items-center justify-center rounded-xl"
+            style={{ background: `linear-gradient(135deg, ${color}55, ${color}11)` }}
+          >
+            <span className="text-4xl font-bold" style={{ color }}>{album.name.charAt(0)}</span>
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <h1 className="text-3xl font-bold text-white">{album.name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">

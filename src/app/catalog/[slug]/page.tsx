@@ -159,6 +159,21 @@ function OverviewTab({ song }: { song: SongDetail }) {
           </div>
         )}
 
+        {/* Track listing for remix collections / multi-track EPs */}
+        {song.parsed_notes?.track_listing && song.parsed_notes.track_listing.length > 0 && (
+          <div className="mt-4 border-t border-gray-700/30 pt-3">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Tracklist</h4>
+            <ol className="space-y-1">
+              {song.parsed_notes.track_listing.map((track, i) => (
+                <li key={i} className="flex items-center gap-3 text-sm">
+                  <span className="w-5 text-right text-xs text-gray-600">{i + 1}</span>
+                  <span className="text-gray-200">{track}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
         {/* Release context */}
         {(song.distributor || song.parsed_notes?.label_info || song.release_date) && (
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t border-gray-700/30 pt-3 text-xs text-gray-500">

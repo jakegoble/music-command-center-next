@@ -98,13 +98,19 @@ export default function AlbumsPage() {
                 href={`/catalog/albums/${album.slug}`}
                 className="group rounded-xl border border-gray-700/50 bg-gray-800/50 p-5 transition-colors hover:border-gray-600"
               >
-                {/* Gradient artwork placeholder */}
-                <div
-                  className="mb-3 flex h-24 items-center justify-center rounded-lg"
-                  style={{ background: `linear-gradient(135deg, ${color}44, ${color}11)` }}
-                >
-                  <span className="text-2xl font-bold" style={{ color }}>{album.name.charAt(0)}</span>
-                </div>
+                {/* Album artwork */}
+                {album.artwork_url ? (
+                  <div className="mb-3 h-24 overflow-hidden rounded-lg">
+                    <img src={album.artwork_url} alt={album.name} className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div
+                    className="mb-3 flex h-24 items-center justify-center rounded-lg"
+                    style={{ background: `linear-gradient(135deg, ${color}44, ${color}11)` }}
+                  >
+                    <span className="text-2xl font-bold" style={{ color }}>{album.name.charAt(0)}</span>
+                  </div>
+                )}
 
                 <h3 className="truncate font-semibold text-white group-hover:text-orange-400">{album.name}</h3>
                 <div className="mt-1 flex items-center gap-2">

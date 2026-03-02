@@ -78,6 +78,8 @@ export interface SongDetail extends SongSummary {
     upcs: string[];
     label_info: string | null;
     urls: string[];
+    track_listing: string[];
+    splits_info: string | null;
   } | null;
   generated_description: string | null;
   highlights: string[];
@@ -104,6 +106,7 @@ export interface AlbumSummary {
   release_date: string | null;
   genres: string[];
   status: string;
+  artwork_url: string | null;
 }
 
 export interface AlbumDetail extends AlbumSummary {

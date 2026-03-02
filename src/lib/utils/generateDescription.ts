@@ -15,6 +15,12 @@ function formatStreamMilestone(streams: number): string | null {
   return null;
 }
 
+/** Detect if a title looks like a remix collection / multi-track EP */
+function isRemixCollection(title: string): boolean {
+  const lower = title.toLowerCase();
+  return lower.includes('remixes') || lower.includes('remix ep') || lower.includes('remix pack');
+}
+
 export function generateHighlights(song: SongDetail): string[] {
   const highlights: string[] = [];
 
@@ -33,6 +39,10 @@ export function generateHighlights(song: SongDetail): string[] {
 
   if (song.album_ep) highlights.push(song.album_ep);
 
+  // Show track count for remix collections
+  const trackCount = song.parsed_notes?.track_listing?.length ?? 0;
+  if (trackCount > 0) highlights.push(`${trackCount} Tracks`);
+
   if (song.collaborators.length > 0) {
     highlights.push(`${song.collaborators.length} Collaborator${song.collaborators.length > 1 ? 's' : ''}`);
   }
@@ -43,6 +53,8 @@ export function generateHighlights(song: SongDetail): string[] {
 export function generateTrackDescription(song: SongDetail): string | null {
   const sentences: string[] = [];
   let dataPoints = 0;
+  const isRemix = isRemixCollection(song.title);
+  const trackCount = song.parsed_notes?.track_listing?.length ?? 0;
 
   // --- Opening: narrative intro ---
   const genres = song.genre.slice(0, 2);
@@ -50,7 +62,14 @@ export function generateTrackDescription(song: SongDetail): string | null {
   if (genreStr) dataPoints++;
 
   let intro = `"${song.title}" is`;
-  if (genreStr) {
+  if (isRemix && trackCount > 0) {
+    // Remix collection intro
+    if (genreStr) {
+      intro += ` a ${genreStr} remix collection by ${song.artist} featuring ${trackCount} remixes`;
+    } else {
+      intro += ` a remix collection by ${song.artist} featuring ${trackCount} remixes`;
+    }
+  } else if (genreStr) {
     const article = /^[aeiou]/i.test(genreStr) ? 'an' : 'a';
     intro += ` ${article} ${genreStr} track by ${song.artist}`;
   } else {

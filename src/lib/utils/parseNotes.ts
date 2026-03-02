@@ -4,6 +4,8 @@ export interface ParsedNotes {
   upcs: string[];
   label_info: string | null;
   urls: string[];
+  track_listing: string[];
+  splits_info: string | null;
   description: string | null;
 }
 
@@ -15,7 +17,9 @@ export function parseNotes(raw: string | null): ParsedNotes | null {
   const isrcs: string[] = [];
   const upcs: string[] = [];
   const urls: string[] = [];
+  const trackListing: string[] = [];
   let labelInfo: string | null = null;
+  let splitsInfo: string | null = null;
 
   // Extract emails
   const emailRe = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
@@ -53,6 +57,31 @@ export function parseNotes(raw: string | null): ParsedNotes | null {
     text = text.replace(labelMatch[0], '');
   }
 
+  // Extract track listings — "Contains: 1. Track Name, 2. Track Name, ..."
+  const containsRe = /Contains\s*:\s*((?:\d+\.\s*[^,\n]+(?:,\s*)?)+)/gi;
+  const containsMatch = containsRe.exec(text);
+  if (containsMatch) {
+    const trackStr = containsMatch[1];
+    const trackEntries = trackStr.split(/,\s*(?=\d+\.)/).map(t => t.trim()).filter(Boolean);
+    for (const entry of trackEntries) {
+      // Strip leading "1. " numbering and trailing ISRC-like codes
+      const cleaned = entry.replace(/^\d+\.\s*/, '').replace(/\s+[A-Z]{2}[A-Z0-9]{3}\d{7}\s*$/, '').trim();
+      if (cleaned) trackListing.push(cleaned);
+    }
+    text = text.replace(containsMatch[0], '');
+  }
+
+  // Extract "Splits with:" or "Splits:" sections
+  const splitsRe = /Splits?\s+with\s*:\s*([^\n.]+(?:[^\n]*@[^\n]+)*)/gi;
+  const splitsMatch = splitsRe.exec(text);
+  if (splitsMatch) {
+    splitsInfo = splitsMatch[1].trim();
+    text = text.replace(splitsMatch[0], '');
+  }
+
+  // Strip "Has Discovery Pack" and similar metadata flags
+  text = text.replace(/Has\s+Discovery\s+Pack\.?/gi, '');
+
   // Clean up remaining text
   text = text
     .replace(/ISRC\s*:/gi, '')
@@ -70,6 +99,8 @@ export function parseNotes(raw: string | null): ParsedNotes | null {
     upcs: [...new Set(upcs)],
     label_info: labelInfo,
     urls: [...new Set(urls)],
+    track_listing: trackListing,
+    splits_info: splitsInfo,
     description,
   };
 }
