@@ -23,6 +23,8 @@ import type { PageObjectResponse } from '@notionhq/client/build/src/api-endpoint
 
 async function fetchSpotifyArtwork(spotifyUrl: string | null): Promise<string | null> {
   if (!spotifyUrl) return null;
+  // Only use track/album URLs — artist URLs return profile photos, not artwork
+  if (!spotifyUrl.includes('/track/') && !spotifyUrl.includes('/album/')) return null;
   try {
     const resp = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(spotifyUrl)}`, {
       signal: AbortSignal.timeout(5000),
@@ -30,6 +32,36 @@ async function fetchSpotifyArtwork(spotifyUrl: string | null): Promise<string | 
     if (!resp.ok) return null;
     const data = await resp.json();
     return data.thumbnail_url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchITunesArtwork(title: string, artist: string): Promise<string | null> {
+  try {
+    const query = `${title} ${artist}`;
+    const resp = await fetch(
+      `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=5`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const results = data?.results;
+    if (!Array.isArray(results) || results.length === 0) return null;
+
+    // Find best match — check artist and title
+    const artistLower = artist.toLowerCase();
+    const titleLower = title.toLowerCase();
+    for (const r of results) {
+      const rArtist = (r.artistName ?? '').toLowerCase();
+      const rTitle = (r.trackName ?? '').toLowerCase();
+      if ((rArtist.includes(artistLower) || artistLower.includes(rArtist)) &&
+          (rTitle.includes(titleLower) || titleLower.includes(rTitle))) {
+        // Upgrade to 600x600 artwork
+        return (r.artworkUrl100 as string)?.replace('100x100', '600x600') ?? null;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -114,15 +146,17 @@ export async function GET(
       const contactIds = getRelationIds(p['Pitched To']);
 
       const spotifyLink = getUrl(p['Spotify Link']);
-      const [collabPages, contractPages, contactPages, artworkUrl] = await Promise.all([
+      const artist = getSelect(p['Artist']);
+      const [collabPages, contractPages, contactPages, spotifyArt] = await Promise.all([
         Promise.all(collabIds.map(fetchRelatedPage)),
         Promise.all(contractIds.map(fetchRelatedPage)),
         Promise.all(contactIds.map(fetchRelatedPage)),
         fetchSpotifyArtwork(spotifyLink),
       ]);
+      // Fall back to iTunes Search when Spotify artwork is unavailable
+      const artworkUrl = spotifyArt ?? await fetchITunesArtwork(title, artist ?? '');
 
       // Fetch royalties for this song's artist
-      const artist = getSelect(p['Artist']);
       let royalties: RoyaltyEntry[] = [];
       if (artist) {
         const royaltyPages = await queryAll(NOTION_DBS.ROYALTY_TRACKING, {

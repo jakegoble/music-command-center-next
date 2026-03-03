@@ -926,10 +926,11 @@ function PressTab({ song }: { song: SongDetail }) {
   const songPress = sortByDate(
     PRESS_COVERAGE.filter(p => p.song && p.song.toLowerCase() === song.title.toLowerCase())
   );
-  const artistPress = sortByDate(
-    PRESS_COVERAGE.filter(p => p.artist.toLowerCase() === song.artist.toLowerCase() && (!p.song || p.song.toLowerCase() !== song.title.toLowerCase()))
+  // General artist press = articles with no specific song reference (not articles about OTHER songs)
+  const generalArtistPress = sortByDate(
+    PRESS_COVERAGE.filter(p => p.artist.toLowerCase() === song.artist.toLowerCase() && !p.song)
   );
-  const allPress = [...songPress, ...artistPress];
+  const allPress = [...songPress, ...generalArtistPress];
 
   if (allPress.length === 0) {
     return (
@@ -1023,13 +1024,13 @@ function PressTab({ song }: { song: SongDetail }) {
           </div>
         </>
       )}
-      {artistPress.length > 0 && (
+      {generalArtistPress.length > 0 && (
         <>
           <p className={`text-xs font-semibold uppercase tracking-wider text-gray-500 ${songPress.length > 0 ? 'mt-2' : ''}`}>
             {songPress.length > 0 ? `More from ${song.artist}` : `Press for ${song.artist}`}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
-            {artistPress.map((p, i) => renderPressCard(p, `artist-${i}`))}
+            {generalArtistPress.map((p, i) => renderPressCard(p, `artist-${i}`))}
           </div>
         </>
       )}
