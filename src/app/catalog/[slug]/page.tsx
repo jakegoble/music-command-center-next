@@ -9,6 +9,7 @@ import { artistToParam, ARTIST_COLORS, type Artist } from '@/config/notion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import type { SongDetail } from '@/lib/types';
 import { PRESS_COVERAGE, type PressCoverage } from '@/lib/data/press-coverage';
+import { toSlug } from '@/lib/utils/slug';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -25,6 +26,12 @@ function isCollection(song: SongDetail): boolean {
   if (trackCount > 1) return true;
   const lower = song.title.toLowerCase();
   return lower.includes('remixes') || lower.includes('remix ep') || lower.includes('remix pack');
+}
+
+/** True when the song record is actually an album/EP container (title ≈ album_ep). */
+function isAlbumContainer(song: SongDetail): boolean {
+  if (!song.album_ep) return false;
+  return toSlug(song.title) === toSlug(song.album_ep);
 }
 
 function CheckIcon({ checked }: { checked: boolean }) {
@@ -1322,6 +1329,17 @@ export default function SongDetailPage() {
 
     return () => { cancelled = true; };
   }, [slug]);
+
+  // Redirect album/EP container pages to the proper album detail route.
+  // Only redirect when the song title IS the album (title slug === album_ep slug).
+  useEffect(() => {
+    if (!song) return;
+    if (isAlbumContainer(song)) {
+      const albumSlug = toSlug(song.album_ep!);
+      const artistParam = artist !== 'all' ? `?artist=${artistToParam(artist)}` : '';
+      router.replace(`/catalog/albums/${albumSlug}${artistParam}`);
+    }
+  }, [song, artist, router]);
 
   if (error) {
     return (

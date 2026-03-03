@@ -418,8 +418,14 @@ export default function CatalogPage() {
     setAlbumFilter('');
   };
 
-  const buildSongHref = (slug: string) =>
-    artist !== 'all' ? `/catalog/${slug}?artist=${artistToParam(artist)}` : `/catalog/${slug}`;
+  const buildSongHref = (song: SongSummary) => {
+    // Collections / album containers link directly to the album page
+    if (song.album_ep && toSlug(song.title) === toSlug(song.album_ep)) {
+      const base = `/catalog/albums/${toSlug(song.album_ep)}`;
+      return artist !== 'all' ? `${base}?artist=${artistToParam(artist)}` : base;
+    }
+    return artist !== 'all' ? `/catalog/${song.slug}?artist=${artistToParam(artist)}` : `/catalog/${song.slug}`;
+  };
 
   if (error) {
     return (
@@ -650,7 +656,7 @@ export default function CatalogPage() {
                             <input type="checkbox" checked={selected.has(song.id)} onChange={() => toggleSelect(song.id)} className="rounded border-gray-600" />
                           </td>
                           <td className="px-3 py-3">
-                            <Link href={buildSongHref(song.slug)} className="font-medium text-white hover:text-orange-400">{song.title}</Link>
+                            <Link href={buildSongHref(song)} className="font-medium text-white hover:text-orange-400">{song.title}</Link>
                           </td>
                           <td className="px-3 py-3">
                             <span className="rounded-full px-2 py-0.5 text-xs font-medium text-white" style={{ backgroundColor: `${artistColor}33`, color: artistColor }}>{song.artist}</span>
@@ -693,7 +699,7 @@ export default function CatalogPage() {
                 songs.map(song => {
                   const color = ARTIST_COLORS[song.artist as Artist] ?? '#6b7280';
                   return (
-                    <Link key={song.id} href={buildSongHref(song.slug)} className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 transition-colors hover:border-gray-600">
+                    <Link key={song.id} href={buildSongHref(song)} className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 transition-colors hover:border-gray-600">
                       <div className="flex items-start justify-between">
                         <div className="min-w-0">
                           <p className="truncate font-medium text-white">{song.title}</p>
@@ -731,7 +737,7 @@ export default function CatalogPage() {
                 <p className="py-8 text-center text-gray-500">No songs found.</p>
               ) : (
                 songs.map(song => (
-                  <Link key={song.id} href={buildSongHref(song.slug)} className="flex items-center gap-3 px-2 py-2 text-sm transition-colors hover:bg-gray-800/30">
+                  <Link key={song.id} href={buildSongHref(song)} className="flex items-center gap-3 px-2 py-2 text-sm transition-colors hover:bg-gray-800/30">
                     <span className="min-w-0 flex-1 truncate font-medium text-white">{song.title}</span>
                     {song.album_ep && <span className="shrink-0 rounded bg-indigo-900/30 px-1.5 py-0.5 text-[10px] text-indigo-300">{song.album_ep}</span>}
                     <span className="shrink-0 text-xs" style={{ color: ARTIST_COLORS[song.artist as Artist] ?? '#6b7280' }}>{song.artist}</span>
