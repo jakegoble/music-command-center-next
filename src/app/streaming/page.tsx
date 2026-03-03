@@ -84,7 +84,7 @@ function PopularityChart({ songs }: { songs: SongSummary[] }) {
     .slice(0, 15);
 
   if (withPop.length === 0) {
-    return <p className="py-4 text-center text-sm text-gray-500">No popularity data available.</p>;
+    return <p className="py-4 text-center text-sm text-gray-500">Add Popularity Score (0-100) to songs in Notion. Get scores from Spotify for Artists.</p>;
   }
 
   return (
@@ -341,10 +341,10 @@ export default function StreamingPage() {
                 <th className="px-3 py-2">Title</th>
                 <th className="px-3 py-2">Artist</th>
                 <th className="px-3 py-2 text-right">Streams</th>
-                <th className="px-3 py-2 text-right">Pop.</th>
-                <th className="px-3 py-2 text-right">Velocity</th>
-                <th className="px-3 py-2">Released</th>
-                <th className="px-3 py-2 text-right">Est. Rev.</th>
+                <th className="hidden px-3 py-2 text-right md:table-cell">Pop.</th>
+                <th className="hidden px-3 py-2 text-right md:table-cell">Velocity</th>
+                <th className="hidden px-3 py-2 lg:table-cell">Released</th>
+                <th className="hidden px-3 py-2 text-right lg:table-cell">Est. Rev.</th>
               </tr>
             </thead>
             <tbody>
@@ -360,10 +360,10 @@ export default function StreamingPage() {
                       <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${ARTIST_COLORS[s.artist as Artist] ?? '#6b7280'}22`, color: ARTIST_COLORS[s.artist as Artist] ?? '#6b7280' }}>{s.artist}</span>
                     </td>
                     <td className="px-3 py-2 text-right text-white">{formatNumber(s.total_streams)}</td>
-                    <td className="px-3 py-2 text-right">{s.popularity_score ?? '\u2014'}</td>
-                    <td className="px-3 py-2 text-right text-gray-400">{velocity ? `${velocity.toFixed(1)}/day` : '\u2014'}</td>
-                    <td className="px-3 py-2 text-gray-400">{s.release_date ?? '\u2014'}</td>
-                    <td className="px-3 py-2 text-right text-emerald-400">{formatCurrency(s.estimated_revenue)}</td>
+                    <td className="hidden px-3 py-2 text-right md:table-cell">{s.popularity_score ?? '\u2014'}</td>
+                    <td className="hidden px-3 py-2 text-right text-gray-400 md:table-cell">{velocity ? `${velocity.toFixed(1)}/day` : '\u2014'}</td>
+                    <td className="hidden px-3 py-2 text-gray-400 lg:table-cell">{s.release_date ?? '\u2014'}</td>
+                    <td className="hidden px-3 py-2 text-right text-emerald-400 lg:table-cell">{formatCurrency(s.estimated_revenue)}</td>
                   </tr>
                 );
               })}

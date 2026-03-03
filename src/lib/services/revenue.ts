@@ -1,4 +1,4 @@
-const PLATFORM_RATES: Record<string, number> = {
+export const PLATFORM_RATES: Record<string, number> = {
   spotify: 0.004,
   apple_music: 0.01,
   youtube_music: 0.002,
@@ -8,7 +8,7 @@ const PLATFORM_RATES: Record<string, number> = {
   other: 0.003,
 };
 
-const PLATFORM_DISTRIBUTION: Record<string, number> = {
+export const PLATFORM_DISTRIBUTION: Record<string, number> = {
   spotify: 0.60,
   apple_music: 0.15,
   youtube_music: 0.08,

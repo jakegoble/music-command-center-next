@@ -779,7 +779,7 @@ function RevenueTab({ song }: { song: SongDetail }) {
               <YAxis type="category" dataKey="source" tick={{ fill: '#D1D5DB', fontSize: 12 }} axisLine={false} tickLine={false} width={100} />
               <Tooltip
                 contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
-                formatter={(value: number | undefined) => [formatCurrency(value ?? 0), 'Revenue']}
+                formatter={(value) => [formatCurrency(Number(value) || 0), 'Revenue']}
               />
               <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                 {sourceEntries.map(([, ], i) => (

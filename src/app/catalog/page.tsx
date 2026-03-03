@@ -782,6 +782,25 @@ export default function CatalogPage() {
               )}
             </div>
           )}
+
+          {/* Songs by Distributor */}
+          {stats && Object.keys(stats.distributor_distribution).length > 0 && (
+            <div className="mt-6 rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Songs by Distributor</h2>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {Object.entries(stats.distributor_distribution).sort((a, b) => b[1] - a[1]).map(([dist, count]) => (
+                  <button
+                    key={dist}
+                    onClick={() => { setDistributorFilter(dist); setFiltersOpen(true); }}
+                    className="rounded-lg border border-gray-700/30 bg-gray-900/50 p-3 text-center transition-colors hover:border-orange-500/50 hover:bg-gray-800/50"
+                  >
+                    <p className="text-lg font-bold text-white">{count}</p>
+                    <p className="mt-0.5 text-xs text-gray-400">{dist}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

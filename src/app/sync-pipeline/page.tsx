@@ -115,10 +115,12 @@ export default function SyncPipelinePage() {
                         <p className="truncate font-medium text-white">{song.title}</p>
                         <span className="text-xs" style={{ color }}>{song.artist}</span>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2 text-xs text-gray-400">
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 text-xs text-gray-400">
                         {song.stems_complete && <span className="rounded bg-blue-900/50 px-2 py-0.5 text-blue-300">Stems</span>}
                         {song.atmos_mix && <span className="rounded bg-purple-900/50 px-2 py-0.5 text-purple-300">Atmos</span>}
-                        <span className="hidden sm:inline">{song.genre.slice(0, 2).join(', ')}</span>
+                        {song.genre.slice(0, 2).map(g => (
+                          <span key={g} className="rounded bg-gray-700/50 px-1.5 py-0.5 text-[10px] text-gray-400 sm:text-xs">{g}</span>
+                        ))}
                       </div>
                     </Link>
                   );

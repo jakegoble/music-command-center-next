@@ -24,7 +24,7 @@ const KPI_STYLES: Record<string, { color: string; border: string }> = {
   'In Progress': { color: 'text-orange-400', border: 'border-l-orange-500' },
   'Total Streams': { color: 'text-purple-400', border: 'border-l-purple-500' },
   'Est. Revenue': { color: 'text-emerald-400', border: 'border-l-emerald-500' },
-  'Actual Revenue': { color: 'text-green-400', border: 'border-l-green-500' },
+  'Avg Rev/Song': { color: 'text-teal-400', border: 'border-l-teal-500' },
   'Sync Ready': { color: 'text-orange-400', border: 'border-l-orange-500' },
   'Has Atmos': { color: 'text-cyan-400', border: 'border-l-cyan-500' },
   'Has Stems': { color: 'text-pink-400', border: 'border-l-pink-500' },
@@ -121,7 +121,7 @@ export default function Dashboard() {
       title: 'Revenue',
       kpis: [
         { label: 'Est. Revenue', value: formatCurrency(stats.total_estimated_revenue) },
-        { label: 'Actual Revenue', value: royaltyData ? formatCurrency(royaltyData.total_revenue) : '$0.00' },
+        { label: 'Avg Rev/Song', value: stats.total_songs > 0 ? formatCurrency(stats.total_estimated_revenue / stats.total_songs) : '$0.00' },
       ],
     },
   ];
@@ -206,7 +206,7 @@ export default function Dashboard() {
             <Link href="/streaming" className="text-xs text-orange-400 hover:text-orange-300">View all &rarr;</Link>
           </div>
           {topSongs.length === 0 ? (
-            <p className="py-4 text-center text-sm text-gray-500">No song data available.</p>
+            <p className="py-4 text-center text-sm text-gray-500">Add songs to your Notion Song Catalog to see top tracks here.</p>
           ) : (
             <div className="space-y-2">
               {topSongs.slice(0, 10).map((song, i) => {
@@ -261,13 +261,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Genre + Mood */}
+      {/* Genre + Releases by Year */}
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         {/* Genre Distribution */}
         <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Genre Distribution</h2>
           {genreEntries.length === 0 ? (
-            <p className="py-4 text-center text-sm text-gray-500">No genre data available.</p>
+            <p className="py-4 text-center text-sm text-gray-500">Add Genre tags to songs in Notion to see genre distribution.</p>
           ) : (
             <div className="space-y-2">
               {genreEntries.slice(0, 10).map(([genre, count], i) => (
@@ -275,49 +275,6 @@ export default function Dashboard() {
                   <span className="w-28 shrink-0 truncate text-sm text-gray-300">{genre}</span>
                   <div className="flex-1">
                     <div className="h-5 rounded" style={{ width: `${(count / maxGenre) * 100}%`, backgroundColor: `${GENRE_COLORS[i % GENRE_COLORS.length]}99` }} />
-                  </div>
-                  <span className="w-8 text-right text-sm text-gray-400">{count}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Mood Distribution */}
-        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Mood Distribution</h2>
-          {moodEntries.length === 0 ? (
-            <p className="py-4 text-center text-sm text-gray-500">No mood data available.</p>
-          ) : (
-            <div className="space-y-2">
-              {moodEntries.slice(0, 10).map(([mood, count], i) => (
-                <div key={mood} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 truncate text-sm text-gray-300">{mood}</span>
-                  <div className="flex-1">
-                    <div className="h-5 rounded" style={{ width: `${(count / maxMood) * 100}%`, backgroundColor: `${MOOD_COLORS[i % MOOD_COLORS.length]}99` }} />
-                  </div>
-                  <span className="w-8 text-right text-sm text-gray-400">{count}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Key + Year Distribution */}
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
-        {/* Key Distribution */}
-        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Key Distribution</h2>
-          {keyEntries.length === 0 ? (
-            <p className="py-4 text-center text-sm text-gray-500">No key data available.</p>
-          ) : (
-            <div className="space-y-2">
-              {keyEntries.slice(0, 12).map(([k, count], i) => (
-                <div key={k} className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 text-sm font-medium text-gray-300">{k}</span>
-                  <div className="flex-1">
-                    <div className="h-5 rounded" style={{ width: `${(count / maxKey) * 100}%`, backgroundColor: `${KEY_COLORS[i % KEY_COLORS.length]}99` }} />
                   </div>
                   <span className="w-8 text-right text-sm text-gray-400">{count}</span>
                 </div>
@@ -344,6 +301,49 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Mood + Key Distribution */}
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
+        {/* Mood Distribution */}
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Mood Distribution</h2>
+          {moodEntries.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-500">Add Mood Tags to songs in Notion to see mood distribution.</p>
+          ) : (
+            <div className="space-y-2">
+              {moodEntries.slice(0, 10).map(([mood, count], i) => (
+                <div key={mood} className="flex items-center gap-3">
+                  <span className="w-28 shrink-0 truncate text-sm text-gray-300">{mood}</span>
+                  <div className="flex-1">
+                    <div className="h-5 rounded" style={{ width: `${(count / maxMood) * 100}%`, backgroundColor: `${MOOD_COLORS[i % MOOD_COLORS.length]}99` }} />
+                  </div>
+                  <span className="w-8 text-right text-sm text-gray-400">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Key Distribution */}
+        <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Key Distribution</h2>
+          {keyEntries.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-500">Add Key metadata to songs in Notion to see key distribution.</p>
+          ) : (
+            <div className="space-y-2">
+              {keyEntries.slice(0, 12).map(([k, count], i) => (
+                <div key={k} className="flex items-center gap-3">
+                  <span className="w-16 shrink-0 text-sm font-medium text-gray-300">{k}</span>
+                  <div className="flex-1">
+                    <div className="h-5 rounded" style={{ width: `${(count / maxKey) * 100}%`, backgroundColor: `${KEY_COLORS[i % KEY_COLORS.length]}99` }} />
+                  </div>
+                  <span className="w-8 text-right text-sm text-gray-400">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Revenue Charts — Recharts */}
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         {/* Revenue by Quarter */}
@@ -357,7 +357,7 @@ export default function Dashboard() {
                 <Tooltip
                   contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
                   labelStyle={{ color: '#D1D5DB' }}
-                  formatter={(value: number | undefined) => [formatCurrency(value ?? 0), 'Revenue']}
+                  formatter={(value) => [formatCurrency(Number(value) || 0), 'Revenue']}
                 />
                 <Bar dataKey="amount" fill="#10B981" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -387,7 +387,7 @@ export default function Dashboard() {
                   </Pie>
                   <Tooltip
                     contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
-                    formatter={(value: number | undefined) => [formatCurrency(value ?? 0), 'Revenue']}
+                    formatter={(value) => [formatCurrency(Number(value) || 0), 'Revenue']}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -405,20 +405,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Distributor Distribution */}
-      {Object.keys(stats.distributor_distribution).length > 0 && (
-        <div className="mt-6 rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Songs by Distributor</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {Object.entries(stats.distributor_distribution).sort((a, b) => b[1] - a[1]).map(([dist, count]) => (
-              <div key={dist} className="rounded-lg border border-gray-700/30 bg-gray-900/50 p-3 text-center">
-                <p className="text-lg font-bold text-white">{count}</p>
-                <p className="mt-0.5 text-xs text-gray-400">{dist}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

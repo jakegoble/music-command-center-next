@@ -658,12 +658,12 @@ export default function AIInsightsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mt-6 flex gap-1 rounded-lg bg-gray-800/50 p-1">
+      <div className="mt-6 flex gap-1 overflow-x-auto rounded-lg bg-gray-800/50 p-1">
         {TABS.map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            className={`shrink-0 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === tab
                 ? 'bg-gray-700 text-white'
                 : 'text-gray-400 hover:text-gray-300'

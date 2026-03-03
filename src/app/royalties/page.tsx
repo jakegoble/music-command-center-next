@@ -39,6 +39,9 @@ export default function RoyaltiesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<RoyaltyTab>('Overview');
+  const [dataType, setDataType] = useState<'reported' | 'estimated'>('reported');
+  const [byArtistData, setByArtistData] = useState<Record<string, number>>({});
+  const [totalStreams, setTotalStreams] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +61,9 @@ export default function RoyaltiesPage() {
         setTotalRevenue(data.total_revenue ?? 0);
         setBySource(data.by_source ?? {});
         setByQuarter(data.by_quarter ?? {});
+        setDataType(data.data_type ?? 'reported');
+        setByArtistData(data.by_artist ?? {});
+        setTotalStreams(data.total_streams ?? 0);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -75,15 +81,18 @@ export default function RoyaltiesPage() {
   const quarterEntries = useMemo(() => Object.entries(byQuarter).sort((a, b) => a[0].localeCompare(b[0])), [byQuarter]);
   const maxQuarterVal = quarterEntries.length > 0 ? Math.max(...quarterEntries.map(([, v]) => v)) : 1;
 
-  // Per-artist breakdown
+  // Per-artist breakdown — use API data when estimated, derive from entries when reported
   const byArtist = useMemo(() => {
+    if (dataType === 'estimated' && Object.keys(byArtistData).length > 0) {
+      return Object.entries(byArtistData).sort((a, b) => b[1] - a[1]);
+    }
     const map: Record<string, number> = {};
     for (const e of entries) {
       const a = e.artist ?? 'Unknown';
       map[a] = (map[a] ?? 0) + e.total;
     }
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [entries]);
+  }, [entries, dataType, byArtistData]);
 
   // Gap detection: find missing source-quarter combos
   const gaps = useMemo(() => {
@@ -192,7 +201,7 @@ export default function RoyaltiesPage() {
       {/* KPIs */}
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
         {[
-          { label: 'Total Revenue', value: formatCurrency(totalRevenue), color: 'text-green-400', border: 'border-l-green-500' },
+          { label: dataType === 'estimated' ? 'Est. Revenue' : 'Total Revenue', value: formatCurrency(totalRevenue), color: 'text-green-400', border: 'border-l-green-500' },
           { label: 'Last Quarter', value: formatCurrency(lastQuarterRevenue), color: 'text-blue-400', border: 'border-l-blue-500' },
           { label: 'Avg / Quarter', value: formatCurrency(avgPerQuarter), color: 'text-purple-400', border: 'border-l-purple-500' },
           { label: 'Top Source', value: topSource ? topSource[0] : '\u2014', color: 'text-orange-400', border: 'border-l-orange-500' },
@@ -204,6 +213,14 @@ export default function RoyaltiesPage() {
           </div>
         ))}
       </div>
+
+      {/* Estimated data banner */}
+      {dataType === 'estimated' && (
+        <div className="mt-4 rounded-lg border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
+          Revenue estimated from streaming data ({formatNumber(totalStreams)} streams × $0.00478 blended rate).
+          Import royalty statements to the Royalty Tracking database in Notion for actual figures.
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mt-6 flex gap-1 border-b border-gray-800">
