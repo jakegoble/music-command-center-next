@@ -1042,6 +1042,7 @@ function PressTab({ song }: { song: SongDetail }) {
 function LyricsTab({ song }: { song: SongDetail }) {
   const [lyrics, setLyrics] = useState<string | null>(null);
   const [geniusUrl, setGeniusUrl] = useState<string | null>(null);
+  const [lyricsSource, setLyricsSource] = useState<'genius' | 'lrclib' | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(true);
   const [lyricsError, setLyricsError] = useState<string | null>(null);
 
@@ -1056,6 +1057,7 @@ function LyricsTab({ song }: { song: SongDetail }) {
         if (cancelled) return;
         setLyrics(data.lyrics ?? null);
         setGeniusUrl(data.genius_url ?? null);
+        setLyricsSource(data.source ?? null);
         if (!data.lyrics && data.error) setLyricsError(data.error);
       })
       .catch(err => { if (!cancelled) setLyricsError(err.message); })
@@ -1124,15 +1126,15 @@ function LyricsTab({ song }: { song: SongDetail }) {
               {lyrics}
             </pre>
           </div>
-          {geniusUrl && (
+          {(geniusUrl || lyricsSource) && (
             <div className="mt-4 border-t border-gray-700/30 pt-3 flex items-center gap-2">
               <a
-                href={geniusUrl}
+                href={geniusUrl ?? 'https://lrclib.net'}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 px-3 py-1.5 text-xs font-medium text-purple-400 hover:bg-purple-500/20 transition-colors"
               >
-                Sourced from Genius &rarr;
+                Sourced from {lyricsSource === 'lrclib' ? 'LRCLIB' : 'Genius'} &rarr;
               </a>
               <span className="text-[10px] text-gray-600">For personal/dashboard use only</span>
             </div>
@@ -1142,16 +1144,12 @@ function LyricsTab({ song }: { song: SongDetail }) {
         <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-700 py-16 text-center">
           <div className="mb-4 text-4xl text-gray-700">&#127925;</div>
           <p className="text-lg font-medium text-gray-400">
-            {lyricsError === 'GENIUS_ACCESS_TOKEN not configured. Add it to your environment variables.'
-              ? 'Genius API not configured'
-              : song.lyrics_status === 'Written'
-                ? 'Lyrics written but not found on Genius.'
-                : 'Lyrics not available yet.'}
+            {song.lyrics_status === 'Written'
+              ? 'Lyrics written but not found on Genius or LRCLIB.'
+              : 'Lyrics not available yet.'}
           </p>
           <p className="mt-2 max-w-md text-sm text-gray-500">
-            {lyricsError === 'GENIUS_ACCESS_TOKEN not configured. Add it to your environment variables.'
-              ? 'Add GENIUS_ACCESS_TOKEN to your environment variables to enable lyrics lookup.'
-              : 'Connect a lyrics provider or add lyrics manually in Notion.'}
+            Submit lyrics to Genius or add them manually in Notion.
           </p>
         </div>
       )}

@@ -67,6 +67,27 @@ async function fetchITunesArtwork(title: string, artist: string): Promise<string
   }
 }
 
+async function fetchAppleMusicArtwork(appleMusicUrl: string | null): Promise<string | null> {
+  if (!appleMusicUrl) return null;
+  try {
+    // Extract album ID from URL: /album/{name}/{albumId} and optional ?i={trackId}
+    const albumMatch = appleMusicUrl.match(/\/album\/[^/]+\/(\d+)/);
+    if (!albumMatch) return null;
+    const url = new URL('https://itunes.apple.com/lookup');
+    // Prefer track ID if present (?i=...), otherwise use album ID
+    const trackIdMatch = appleMusicUrl.match(/[?&]i=(\d+)/);
+    url.searchParams.set('id', trackIdMatch?.[1] ?? albumMatch[1]);
+    const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const result = data?.results?.[0];
+    if (!result?.artworkUrl100) return null;
+    return (result.artworkUrl100 as string).replace('100x100', '600x600');
+  } catch {
+    return null;
+  }
+}
+
 async function fetchRelatedPage(pageId: string): Promise<PageObjectResponse | null> {
   try {
     const page = await notion.pages.retrieve({ page_id: pageId });
@@ -146,15 +167,17 @@ export async function GET(
       const contactIds = getRelationIds(p['Pitched To']);
 
       const spotifyLink = getUrl(p['Spotify Link']);
+      const appleMusicLink = getUrl(p['Apple Music Link']);
       const artist = getSelect(p['Artist']);
-      const [collabPages, contractPages, contactPages, spotifyArt] = await Promise.all([
+      const [collabPages, contractPages, contactPages, spotifyArt, appleMusicArt] = await Promise.all([
         Promise.all(collabIds.map(fetchRelatedPage)),
         Promise.all(contractIds.map(fetchRelatedPage)),
         Promise.all(contactIds.map(fetchRelatedPage)),
         fetchSpotifyArtwork(spotifyLink),
+        fetchAppleMusicArtwork(appleMusicLink),
       ]);
-      // Fall back to iTunes Search when Spotify artwork is unavailable
-      const artworkUrl = spotifyArt ?? await fetchITunesArtwork(title, artist ?? '');
+      // Fallback chain: Spotify → Apple Music (exact lookup) → iTunes Search (fuzzy)
+      const artworkUrl = spotifyArt ?? appleMusicArt ?? await fetchITunesArtwork(title, artist ?? '');
 
       // Fetch royalties for this song's artist
       let royalties: RoyaltyEntry[] = [];

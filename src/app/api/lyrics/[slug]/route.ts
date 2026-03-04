@@ -10,6 +10,7 @@ import { toSlug } from '@/lib/utils/slug';
 interface LyricsResult {
   lyrics: string | null;
   genius_url: string | null;
+  source?: 'genius' | 'lrclib';
   title: string;
   artist: string;
   error?: string;
@@ -110,6 +111,27 @@ async function scrapeLyrics(geniusUrl: string): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
+// LRCLIB fallback (free, no auth)
+// ---------------------------------------------------------------------------
+
+async function fetchLrclib(title: string, artist: string): Promise<string | null> {
+  try {
+    const url = new URL('https://lrclib.net/api/get');
+    url.searchParams.set('artist_name', artist);
+    url.searchParams.set('track_name', title);
+    const res = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    // Prefer plain lyrics; fall back to synced lyrics with timestamps stripped
+    return data?.plainLyrics ?? data?.syncedLyrics?.replace(/\[\d+:\d+\.\d+\]\s*/g, '').trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
@@ -126,17 +148,8 @@ export async function GET(
       return NextResponse.json(cached.data);
     }
 
-    // Check for Genius API token
+    // Genius API token (optional — LRCLIB fallback works without it)
     const token = process.env.GENIUS_ACCESS_TOKEN;
-    if (!token) {
-      return NextResponse.json({
-        lyrics: null,
-        genius_url: null,
-        title: '',
-        artist: '',
-        error: 'GENIUS_ACCESS_TOKEN not configured. Add it to your environment variables.',
-      });
-    }
 
     // Look up song in Notion by slug
     const songInfo = await getCached(`song-basic:${slug}`, SONG_TTL, async () => {
@@ -160,24 +173,42 @@ export async function GET(
     }
 
     // Search Genius
-    const geniusResult = await searchGenius(songInfo.title, songInfo.artist, token);
+    const geniusResult = token ? await searchGenius(songInfo.title, songInfo.artist, token) : null;
+
     if (!geniusResult) {
+      // Try LRCLIB as fallback
+      const lrclibLyrics = await fetchLrclib(songInfo.title, songInfo.artist);
+      if (lrclibLyrics) {
+        const result: LyricsResult = {
+          lyrics: lrclibLyrics,
+          genius_url: null,
+          source: 'lrclib',
+          title: songInfo.title,
+          artist: songInfo.artist,
+        };
+        lyricsCache.set(slug, { data: result, ts: Date.now() });
+        return NextResponse.json(result);
+      }
       const result: LyricsResult = {
         lyrics: null,
         genius_url: null,
         title: songInfo.title,
         artist: songInfo.artist,
-        error: 'No matching lyrics found on Genius',
+        error: token ? 'No matching lyrics found on Genius or LRCLIB' : 'GENIUS_ACCESS_TOKEN not configured. Add it to your environment variables.',
       };
       lyricsCache.set(slug, { data: result, ts: Date.now() });
       return NextResponse.json(result);
     }
 
     // Scrape lyrics from Genius page
-    const lyrics = await scrapeLyrics(geniusResult.url);
+    const geniusLyrics = await scrapeLyrics(geniusResult.url);
+    // If Genius scraping failed, try LRCLIB as fallback
+    const lyrics = geniusLyrics ?? await fetchLrclib(songInfo.title, songInfo.artist);
+    const source = geniusLyrics ? 'genius' as const : lyrics ? 'lrclib' as const : undefined;
     const result: LyricsResult = {
       lyrics,
-      genius_url: geniusResult.url,
+      genius_url: geniusLyrics ? geniusResult.url : null,
+      source,
       title: songInfo.title,
       artist: songInfo.artist,
       error: lyrics ? undefined : 'Could not extract lyrics from Genius page',
