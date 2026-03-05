@@ -50,7 +50,10 @@ export async function POST(request: NextRequest) {
 
     // Auth check
     const adminSecret = process.env.ADMIN_SECRET;
-    if (!adminSecret || secret !== adminSecret) {
+    if (!adminSecret) {
+      return NextResponse.json({ error: 'ADMIN_SECRET not configured' }, { status: 500 });
+    }
+    if (secret !== adminSecret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
