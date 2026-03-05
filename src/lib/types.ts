@@ -2,6 +2,10 @@
 // Song types
 // ---------------------------------------------------------------------------
 
+export type StreamingPlatform = 'spotify' | 'apple_music' | 'youtube_music' | 'amazon_music' | 'tidal' | 'deezer' | 'other';
+
+export type PlatformStreams = Partial<Record<StreamingPlatform, number>>;
+
 export interface SongSummary {
   id: string;
   slug: string;
@@ -16,6 +20,7 @@ export interface SongSummary {
   release_date: string | null;
   distributor: string | null;
   total_streams: number;
+  platform_streams: PlatformStreams | null;
   popularity_score: number | null;
   isrc: string | null;
   upc: string | null;

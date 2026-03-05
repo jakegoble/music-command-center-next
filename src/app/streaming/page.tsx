@@ -4,7 +4,32 @@ import { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { useArtistContext } from '@/lib/contexts/ArtistContext';
 import { artistToParam, ARTIST_COLORS, type Artist } from '@/config/notion';
-import type { SongSummary, CatalogStats } from '@/lib/types';
+import type { SongSummary, CatalogStats, StreamingPlatform } from '@/lib/types';
+
+// ---------------------------------------------------------------------------
+// Platform config
+// ---------------------------------------------------------------------------
+
+const PLATFORMS: { key: 'all' | StreamingPlatform; label: string; color: string }[] = [
+  { key: 'all', label: 'All Platforms', color: '#8B5CF6' },
+  { key: 'spotify', label: 'Spotify', color: '#1DB954' },
+  { key: 'apple_music', label: 'Apple Music', color: '#FC3C44' },
+  { key: 'youtube_music', label: 'YouTube Music', color: '#FF0000' },
+  { key: 'amazon_music', label: 'Amazon Music', color: '#25D1DA' },
+  { key: 'tidal', label: 'Tidal', color: '#000000' },
+  { key: 'deezer', label: 'Deezer', color: '#A238FF' },
+  { key: 'other', label: 'Other', color: '#6B7280' },
+];
+
+const PLATFORM_LABELS: Record<StreamingPlatform, string> = {
+  spotify: 'Spotify',
+  apple_music: 'Apple Music',
+  youtube_music: 'YouTube Music',
+  amazon_music: 'Amazon Music',
+  tidal: 'Tidal',
+  deezer: 'Deezer',
+  other: 'Other',
+};
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -17,14 +42,21 @@ function formatCurrency(n: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Velocity: streams per day since release
+// Helpers
 // ---------------------------------------------------------------------------
-function calcVelocity(song: SongSummary): number | null {
-  if (!song.release_date || song.total_streams === 0) return null;
+
+function getStreamsForPlatform(song: SongSummary, platform: 'all' | StreamingPlatform): number {
+  if (platform === 'all') return song.total_streams;
+  return song.platform_streams?.[platform] ?? 0;
+}
+
+function calcVelocity(song: SongSummary, platform: 'all' | StreamingPlatform): number | null {
+  const streams = getStreamsForPlatform(song, platform);
+  if (!song.release_date || streams === 0) return null;
   const released = new Date(song.release_date);
   const now = new Date();
   const days = Math.max(1, Math.floor((now.getTime() - released.getTime()) / (1000 * 60 * 60 * 24)));
-  return song.total_streams / days;
+  return streams / days;
 }
 
 function isRecentThreeYears(song: SongSummary): boolean {
@@ -75,6 +107,82 @@ function BarChart({
 }
 
 // ---------------------------------------------------------------------------
+// Platform Distribution Donut (SVG)
+// ---------------------------------------------------------------------------
+function PlatformDonut({ songs }: { songs: SongSummary[] }) {
+  const totalStreams = songs.reduce((sum, s) => sum + s.total_streams, 0);
+  if (totalStreams === 0) return <p className="py-4 text-center text-sm text-gray-500">No stream data.</p>;
+
+  // Aggregate per-platform streams across all songs
+  const platformTotals: Record<string, number> = {};
+  for (const song of songs) {
+    if (!song.platform_streams) continue;
+    for (const [platform, count] of Object.entries(song.platform_streams)) {
+      platformTotals[platform] = (platformTotals[platform] ?? 0) + (count ?? 0);
+    }
+  }
+
+  const entries = Object.entries(platformTotals)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1]);
+
+  const size = 200;
+  const cx = size / 2, cy = size / 2, r = 70, inner = 45;
+  let currentAngle = -Math.PI / 2;
+
+  const arcs = entries.map(([platform, count]) => {
+    const fraction = count / totalStreams;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + fraction * 2 * Math.PI;
+    currentAngle = endAngle;
+
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    const ix1 = cx + inner * Math.cos(endAngle);
+    const iy1 = cy + inner * Math.sin(endAngle);
+    const ix2 = cx + inner * Math.cos(startAngle);
+    const iy2 = cy + inner * Math.sin(startAngle);
+    const largeArc = fraction > 0.5 ? 1 : 0;
+
+    const d = [
+      `M ${x1} ${y1}`,
+      `A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`,
+      `L ${ix1} ${iy1}`,
+      `A ${inner} ${inner} 0 ${largeArc} 0 ${ix2} ${iy2}`,
+      'Z',
+    ].join(' ');
+
+    const color = PLATFORMS.find(p => p.key === platform)?.color ?? '#6B7280';
+    return { platform, count, fraction, d, color };
+  });
+
+  return (
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+      <svg viewBox={`0 0 ${size} ${size}`} className="h-44 w-44 shrink-0">
+        {arcs.map(arc => (
+          <path key={arc.platform} d={arc.d} fill={arc.color} opacity={0.8}>
+            <title>{`${PLATFORM_LABELS[arc.platform as StreamingPlatform] ?? arc.platform}: ${formatNumber(arc.count)} (${(arc.fraction * 100).toFixed(1)}%)`}</title>
+          </path>
+        ))}
+        <text x={cx} y={cy - 6} textAnchor="middle" className="fill-white text-sm font-bold">{formatNumber(totalStreams)}</text>
+        <text x={cx} y={cy + 10} textAnchor="middle" className="fill-gray-400 text-[9px]">total streams</text>
+      </svg>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+        {arcs.map(arc => (
+          <div key={arc.platform} className="flex items-center gap-2">
+            <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: arc.color }} />
+            <span className="text-xs text-gray-300">{PLATFORM_LABELS[arc.platform as StreamingPlatform] ?? arc.platform}</span>
+            <span className="text-xs text-gray-500">{(arc.fraction * 100).toFixed(0)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Popularity Chart (color-graduated bars)
 // ---------------------------------------------------------------------------
 function PopularityChart({ songs }: { songs: SongSummary[] }) {
@@ -113,8 +221,8 @@ function PopularityChart({ songs }: { songs: SongSummary[] }) {
 // ---------------------------------------------------------------------------
 // Release Impact Scatter (SVG)
 // ---------------------------------------------------------------------------
-function ReleaseImpactScatter({ songs }: { songs: SongSummary[] }) {
-  const withData = songs.filter(s => s.release_date && s.total_streams > 0);
+function ReleaseImpactScatter({ songs, platform }: { songs: SongSummary[]; platform: 'all' | StreamingPlatform }) {
+  const withData = songs.filter(s => s.release_date && getStreamsForPlatform(s, platform) > 0);
   if (withData.length === 0) return <p className="py-4 text-center text-sm text-gray-500">Not enough data.</p>;
 
   const w = 500, h = 280;
@@ -124,7 +232,7 @@ function ReleaseImpactScatter({ songs }: { songs: SongSummary[] }) {
   const minDate = Math.min(...dates);
   const maxDate = Math.max(...dates);
   const dateRange = maxDate - minDate || 1;
-  const maxStreams = Math.max(...withData.map(s => s.total_streams));
+  const maxStreams = Math.max(...withData.map(s => getStreamsForPlatform(s, platform)));
 
   function xPos(date: string) {
     return pad.left + ((new Date(date).getTime() - minDate) / dateRange) * (w - pad.left - pad.right);
@@ -135,26 +243,24 @@ function ReleaseImpactScatter({ songs }: { songs: SongSummary[] }) {
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full">
-      {/* Axis labels */}
       <text x={w / 2} y={h - 4} textAnchor="middle" className="fill-gray-500 text-[10px]">Release Date</text>
       <text x={10} y={h / 2} textAnchor="middle" transform={`rotate(-90, 10, ${h / 2})`} className="fill-gray-500 text-[10px]">Streams</text>
-      {/* Border */}
       <rect x={pad.left} y={pad.top} width={w - pad.left - pad.right} height={h - pad.top - pad.bottom} fill="none" stroke="#374151" strokeWidth={1} />
-      {/* Data points */}
       {withData.map(s => {
-        const velocity = calcVelocity(s);
+        const streams = getStreamsForPlatform(s, platform);
+        const velocity = calcVelocity(s, platform);
         const radius = Math.max(4, Math.min(16, velocity ? Math.sqrt(velocity) * 1.5 : 4));
         const color = ARTIST_COLORS[s.artist as Artist] ?? '#6b7280';
         return (
           <g key={s.id}>
             <circle
               cx={xPos(s.release_date!)}
-              cy={yPos(s.total_streams)}
+              cy={yPos(streams)}
               r={radius}
               fill={color}
               opacity={0.6}
             />
-            <title>{`${s.title} — ${formatNumber(s.total_streams)} streams${velocity ? ` (${velocity.toFixed(1)}/day)` : ''}`}</title>
+            <title>{`${s.title} — ${formatNumber(streams)} streams${velocity ? ` (${velocity.toFixed(1)}/day)` : ''}`}</title>
           </g>
         );
       })}
@@ -171,6 +277,7 @@ export default function StreamingPage() {
   const [stats, setStats] = useState<CatalogStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<'all' | StreamingPlatform>('spotify');
 
   useEffect(() => {
     let cancelled = false;
@@ -202,18 +309,33 @@ export default function StreamingPage() {
     return () => { cancelled = true; };
   }, [artist]);
 
+  // Compute top songs for the selected platform
   const topAllTime = useMemo(
-    () => songs.filter(s => s.total_streams > 0).sort((a, b) => b.total_streams - a.total_streams),
-    [songs],
+    () => songs
+      .filter(s => getStreamsForPlatform(s, platform) > 0)
+      .sort((a, b) => getStreamsForPlatform(b, platform) - getStreamsForPlatform(a, platform)),
+    [songs, platform],
   );
   const topRecent = useMemo(
-    () => songs.filter(s => isRecentThreeYears(s) && s.total_streams > 0).sort((a, b) => b.total_streams - a.total_streams),
-    [songs],
+    () => songs
+      .filter(s => isRecentThreeYears(s) && getStreamsForPlatform(s, platform) > 0)
+      .sort((a, b) => getStreamsForPlatform(b, platform) - getStreamsForPlatform(a, platform)),
+    [songs, platform],
   );
   const byVelocity = useMemo(
-    () => songs.map(s => ({ ...s, velocity: calcVelocity(s) })).filter(s => s.velocity !== null && s.velocity > 0).sort((a, b) => (b.velocity ?? 0) - (a.velocity ?? 0)),
-    [songs],
+    () => songs
+      .map(s => ({ ...s, velocity: calcVelocity(s, platform) }))
+      .filter(s => s.velocity !== null && s.velocity > 0)
+      .sort((a, b) => (b.velocity ?? 0) - (a.velocity ?? 0)),
+    [songs, platform],
   );
+
+  // Total streams for current platform filter
+  const platformTotal = useMemo(
+    () => songs.reduce((sum, s) => sum + getStreamsForPlatform(s, platform), 0),
+    [songs, platform],
+  );
+  const platformColor = PLATFORMS.find(p => p.key === platform)?.color ?? '#8B5CF6';
 
   if (error) {
     return (
@@ -235,17 +357,42 @@ export default function StreamingPage() {
     );
   }
 
-  const avgStreams = stats.total_songs > 0 ? Math.round(stats.total_streams / stats.total_songs) : 0;
+  const avgStreams = topAllTime.length > 0 ? Math.round(platformTotal / topAllTime.length) : 0;
   const releasedPct = stats.total_songs > 0 ? Math.round((stats.released / stats.total_songs) * 100) : 0;
 
   return (
     <div>
       <PageHeader title="Streaming" />
 
+      {/* Platform Filter Tabs */}
+      <div className="mt-6 flex flex-wrap gap-2">
+        {PLATFORMS.map(p => (
+          <button
+            key={p.key}
+            onClick={() => setPlatform(p.key)}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              platform === p.key
+                ? 'text-white shadow-md'
+                : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50 hover:text-gray-300'
+            }`}
+            style={platform === p.key ? { backgroundColor: p.color } : undefined}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Estimated data notice */}
+      <p className="mt-3 text-xs text-gray-500">
+        {platform === 'all'
+          ? 'Showing total streams across all platforms.'
+          : `Estimated ${PLATFORMS.find(p => p.key === platform)?.label} streams based on industry distribution. Connect Songstats for actual per-platform data.`}
+      </p>
+
       {/* KPIs */}
-      <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { label: 'Total Streams', value: formatNumber(stats.total_streams), color: 'text-purple-400', border: 'border-l-purple-500' },
+          { label: platform === 'all' ? 'Total Streams' : `${PLATFORMS.find(p => p.key === platform)?.label} Streams`, value: formatNumber(platformTotal), color: 'text-purple-400', border: 'border-l-purple-500' },
           { label: 'Songs Released', value: `${stats.released} (${releasedPct}%)`, color: 'text-green-400', border: 'border-l-green-500' },
           { label: 'Avg Streams/Song', value: formatNumber(avgStreams), color: 'text-blue-400', border: 'border-l-blue-500' },
           { label: 'Est. Revenue', value: formatCurrency(stats.total_estimated_revenue), color: 'text-emerald-400', border: 'border-l-emerald-500' },
@@ -259,6 +406,15 @@ export default function StreamingPage() {
 
       {/* Charts Grid */}
       <div className="mt-6 grid gap-6 md:grid-cols-2">
+        {/* Platform Distribution Donut — only show on "All" */}
+        {platform === 'all' && (
+          <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Platform Distribution</h2>
+            <PlatformDonut songs={songs} />
+            <p className="mt-3 text-[10px] text-gray-600">Based on industry distribution estimates. Connect Songstats for actual data.</p>
+          </div>
+        )}
+
         {/* Top 15 All-Time */}
         <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Top 15 Songs — All Time</h2>
@@ -268,8 +424,8 @@ export default function StreamingPage() {
             <BarChart
               data={topAllTime.slice(0, 15).map(s => ({
                 label: s.title,
-                value: s.total_streams,
-                color: ARTIST_COLORS[s.artist as Artist] ?? '#8B5CF6',
+                value: getStreamsForPlatform(s, platform),
+                color: platform === 'all' ? (ARTIST_COLORS[s.artist as Artist] ?? '#8B5CF6') : platformColor,
               }))}
             />
           )}
@@ -284,8 +440,8 @@ export default function StreamingPage() {
             <BarChart
               data={topRecent.slice(0, 15).map(s => ({
                 label: s.title,
-                value: s.total_streams,
-                color: ARTIST_COLORS[s.artist as Artist] ?? '#3B82F6',
+                value: getStreamsForPlatform(s, platform),
+                color: platform === 'all' ? (ARTIST_COLORS[s.artist as Artist] ?? '#3B82F6') : platformColor,
               }))}
             />
           )}
@@ -307,7 +463,7 @@ export default function StreamingPage() {
               data={byVelocity.slice(0, 15).map(s => ({
                 label: s.title,
                 value: Math.round(s.velocity ?? 0),
-                color: ARTIST_COLORS[s.artist as Artist] ?? '#22C55E',
+                color: platform === 'all' ? (ARTIST_COLORS[s.artist as Artist] ?? '#22C55E') : platformColor,
               }))}
               valueFormatter={v => `${v}/day`}
             />
@@ -318,7 +474,7 @@ export default function StreamingPage() {
         <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-5 md:col-span-2">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Release Impact — Streams by Release Date</h2>
           <p className="mb-3 text-xs text-gray-500">Bubble size = velocity (streams/day). Color = artist.</p>
-          <ReleaseImpactScatter songs={songs} />
+          <ReleaseImpactScatter songs={songs} platform={platform} />
           <div className="mt-2 flex flex-wrap gap-3 text-xs">
             {Object.entries(ARTIST_COLORS).map(([name, color]) => (
               <span key={name} className="flex items-center gap-1.5">
@@ -349,7 +505,8 @@ export default function StreamingPage() {
             </thead>
             <tbody>
               {topAllTime.slice(0, 20).map((s, i) => {
-                const velocity = calcVelocity(s);
+                const streams = getStreamsForPlatform(s, platform);
+                const velocity = calcVelocity(s, platform);
                 return (
                   <tr key={s.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
                     <td className="px-3 py-2 text-gray-500">{i + 1}</td>
@@ -359,7 +516,7 @@ export default function StreamingPage() {
                     <td className="px-3 py-2">
                       <span className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: `${ARTIST_COLORS[s.artist as Artist] ?? '#6b7280'}22`, color: ARTIST_COLORS[s.artist as Artist] ?? '#6b7280' }}>{s.artist}</span>
                     </td>
-                    <td className="px-3 py-2 text-right text-white">{formatNumber(s.total_streams)}</td>
+                    <td className="px-3 py-2 text-right text-white">{formatNumber(streams)}</td>
                     <td className="hidden px-3 py-2 text-right md:table-cell">{s.popularity_score ?? '\u2014'}</td>
                     <td className="hidden px-3 py-2 text-right text-gray-400 md:table-cell">{velocity ? `${velocity.toFixed(1)}/day` : '\u2014'}</td>
                     <td className="hidden px-3 py-2 text-gray-400 lg:table-cell">{s.release_date ?? '\u2014'}</td>

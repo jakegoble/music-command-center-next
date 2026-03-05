@@ -12,8 +12,8 @@ import {
   getUrl,
   getRelationIds,
 } from '@/lib/clients/notion';
-import { estimateRevenue } from '@/lib/services/revenue';
-import type { SongSummary } from '@/lib/types';
+import { estimateRevenue, PLATFORM_DISTRIBUTION } from '@/lib/services/revenue';
+import type { SongSummary, PlatformStreams, StreamingPlatform } from '@/lib/types';
 import type { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints';
 import { toSlug } from '@/lib/utils/slug';
 
@@ -27,6 +27,16 @@ export function mapPageToSong(page: PageObjectResponse): SongSummary {
   const p = page.properties;
   const title = getText(p['Song Title']) ?? '';
   const streams = getNumber(p['Total Streams']) ?? 0;
+
+  // Estimate per-platform streams from total using distribution weights
+  const platformStreams: PlatformStreams | null = streams > 0
+    ? Object.fromEntries(
+        Object.entries(PLATFORM_DISTRIBUTION).map(([platform, share]) => [
+          platform as StreamingPlatform,
+          Math.round(streams * share),
+        ]),
+      ) as PlatformStreams
+    : null;
 
   return {
     id: page.id,
@@ -42,6 +52,7 @@ export function mapPageToSong(page: PageObjectResponse): SongSummary {
     release_date: getDate(p['Release Date']),
     distributor: getSelect(p['Distributor']),
     total_streams: streams,
+    platform_streams: platformStreams,
     popularity_score: getNumber(p['Popularity Score']),
     isrc: getText(p['ISRC']),
     upc: getText(p['UPC']),

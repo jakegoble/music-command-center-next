@@ -14,11 +14,11 @@ import {
   getUrl,
   getRelationIds,
 } from '@/lib/clients/notion';
-import { estimateRevenue, parseWriterSplits } from '@/lib/services/revenue';
+import { estimateRevenue, parseWriterSplits, PLATFORM_DISTRIBUTION } from '@/lib/services/revenue';
 import { toSlug } from '@/lib/services/songs';
 import { parseNotes } from '@/lib/utils/parseNotes';
 import { generateTrackDescription, generateHighlights } from '@/lib/utils/generateDescription';
-import type { SongDetail, CollaboratorSummary, ContractSummary, LicensingContactSummary, RoyaltyEntry } from '@/lib/types';
+import type { SongDetail, CollaboratorSummary, ContractSummary, LicensingContactSummary, RoyaltyEntry, PlatformStreams, StreamingPlatform } from '@/lib/types';
 import type { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints';
 
 async function fetchSpotifyArtwork(spotifyUrl: string | null): Promise<string | null> {
@@ -229,6 +229,14 @@ export async function GET(
         release_date: getDate(p['Release Date']),
         distributor: getSelect(p['Distributor']),
         total_streams: streams,
+        platform_streams: streams > 0
+          ? Object.fromEntries(
+              Object.entries(PLATFORM_DISTRIBUTION).map(([plat, share]) => [
+                plat as StreamingPlatform,
+                Math.round(streams * share),
+              ]),
+            ) as PlatformStreams
+          : null,
         popularity_score: getNumber(p['Popularity Score']),
         isrc: getText(p['ISRC']),
         upc: getText(p['UPC']),
