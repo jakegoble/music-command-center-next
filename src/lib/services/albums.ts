@@ -64,6 +64,7 @@ function stripReleaseSuffix(name: string): string {
   return name
     .replace(/\s*[-–—]\s*(single|ep|album)\s*$/i, '')
     .replace(/\s*\((?:single|ep|album|[^)]*music[^)]*)\)\s*$/i, '')
+    .replace(/\s+(?:EP|LP|Single)\b/g, '')
     .trim();
 }
 
@@ -95,6 +96,32 @@ async function fetchITunesSearchArt(title: string, artist: string): Promise<stri
   }
 }
 
+async function fetchITunesTrackArt(trackTitle: string, artist: string): Promise<string | null> {
+  try {
+    const resp = await fetch(
+      `https://itunes.apple.com/search?term=${encodeURIComponent(`${trackTitle} ${artist}`)}&media=music&entity=song&limit=5`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const results = data?.results;
+    if (!Array.isArray(results) || results.length === 0) return null;
+    const artistLower = artist.toLowerCase();
+    const titleLower = trackTitle.toLowerCase();
+    for (const r of results) {
+      const rArtist = (r.artistName ?? '').toLowerCase();
+      const rTitle = (r.trackName ?? '').toLowerCase();
+      if ((rArtist.includes(artistLower) || artistLower.includes(rArtist)) &&
+          (rTitle.includes(titleLower) || titleLower.includes(rTitle))) {
+        return (r.artworkUrl100 as string)?.replace('100x100', '600x600') ?? null;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchAlbumArtwork(tracks: SongSummary[], albumName: string, albumArtist: string): Promise<string | null> {
   // Try Spotify links from tracks
   for (const track of tracks) {
@@ -111,7 +138,13 @@ async function fetchAlbumArtwork(tracks: SongSummary[], albumName: string, album
     }
   }
   // Fall back to iTunes Search by album name + artist
-  return fetchITunesSearchArt(albumName, albumArtist);
+  const albumArt = await fetchITunesSearchArt(albumName, albumArtist);
+  if (albumArt) return albumArt;
+  // Final fallback: search by first track title (catches collab releases under different album artist)
+  if (tracks.length > 0) {
+    return fetchITunesTrackArt(tracks[0].title, albumArtist);
+  }
+  return null;
 }
 
 function groupSongsByAlbum(songs: SongSummary[]): Map<string, SongSummary[]> {
