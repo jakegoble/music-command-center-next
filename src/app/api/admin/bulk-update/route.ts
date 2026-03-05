@@ -10,16 +10,21 @@ import { toSlug } from '@/lib/utils/slug';
 // POST /api/admin/bulk-update
 // Body: { secret: string, updates: Array<{ slug: string, fields: Record<string, any> }> }
 //
-// Supported fields: bpm (number), key (string/select), total_streams (number),
-//                   spotify_link (url), apple_music_link (url)
+// Supported fields: bpm (number), key (rich_text), total_streams (number),
+//                   spotify_link (url), apple_music_link (url),
+//                   duration (rich_text), popularity_score (number),
+//                   mood (multi_select — array of strings)
 // ---------------------------------------------------------------------------
 
-const FIELD_MAP: Record<string, { prop: string; type: 'number' | 'select' | 'rich_text' | 'url' }> = {
+const FIELD_MAP: Record<string, { prop: string; type: 'number' | 'select' | 'rich_text' | 'url' | 'multi_select' }> = {
   bpm: { prop: 'BPM', type: 'number' },
   key: { prop: 'Key', type: 'rich_text' },
   total_streams: { prop: 'Total Streams', type: 'number' },
   spotify_link: { prop: 'Spotify Link', type: 'url' },
   apple_music_link: { prop: 'Apple Music Link', type: 'url' },
+  duration: { prop: 'Duration', type: 'rich_text' },
+  popularity_score: { prop: 'Popularity Score', type: 'number' },
+  mood: { prop: 'Mood Tags', type: 'multi_select' },
 };
 
 function buildProperties(fields: Record<string, unknown>) {
@@ -35,6 +40,9 @@ function buildProperties(fields: Record<string, unknown>) {
       properties[mapping.prop] = { rich_text: [{ text: { content: String(value) } }] };
     } else if (mapping.type === 'url') {
       properties[mapping.prop] = { url: String(value) };
+    } else if (mapping.type === 'multi_select') {
+      const tags = Array.isArray(value) ? value : [value];
+      properties[mapping.prop] = { multi_select: tags.map(t => ({ name: String(t) })) };
     }
   }
   return properties;
@@ -73,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     const results: Array<{ slug: string; status: string; error?: string }> = [];
 
-    // Process updates in batches of 10 (Notion rate limit ~3 req/s)
+    // Process updates (Notion rate limit ~3 req/s)
     for (let i = 0; i < updates.length; i++) {
       const { slug, fields } = updates[i];
       const pageId = slugToPage.get(slug);
@@ -81,6 +89,19 @@ export async function POST(request: NextRequest) {
         results.push({ slug, status: 'not_found' });
         continue;
       }
+
+      // Special: archive (soft-delete) the page
+      if (fields._archive === true) {
+        try {
+          await notion.pages.update({ page_id: pageId, archived: true });
+          results.push({ slug, status: 'archived' });
+        } catch (err) {
+          results.push({ slug, status: 'error', error: (err as Error).message });
+        }
+        if (i % 3 === 2) await new Promise(r => setTimeout(r, 400));
+        continue;
+      }
+
       const properties = buildProperties(fields);
       if (Object.keys(properties).length === 0) {
         results.push({ slug, status: 'no_valid_fields' });
