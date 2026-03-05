@@ -21,26 +21,87 @@ function normalizeAlbumName(raw: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Fetch Spotify artwork for an album via the oEmbed endpoint.
-// Picks the first track with a Spotify link and grabs its thumbnail.
+// Fetch artwork for an album.
+// Fallback chain: Spotify oEmbed → Apple Music (iTunes Lookup) → iTunes Search
 // ---------------------------------------------------------------------------
 
-async function fetchAlbumArtwork(tracks: SongSummary[]): Promise<string | null> {
+async function fetchSpotifyArt(url: string): Promise<string | null> {
+  // Only use track/album URLs — artist URLs return profile photos
+  if (!url.includes('/track/') && !url.includes('/album/')) return null;
+  try {
+    const resp = await fetch(
+      `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.thumbnail_url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchAppleMusicArt(url: string): Promise<string | null> {
+  try {
+    const albumMatch = url.match(/\/album\/[^/]+\/(\d+)/);
+    if (!albumMatch) return null;
+    const lookupUrl = new URL('https://itunes.apple.com/lookup');
+    const trackIdMatch = url.match(/[?&]i=(\d+)/);
+    lookupUrl.searchParams.set('id', trackIdMatch?.[1] ?? albumMatch[1]);
+    const resp = await fetch(lookupUrl.toString(), { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const result = data?.results?.[0];
+    if (!result?.artworkUrl100) return null;
+    return (result.artworkUrl100 as string).replace('100x100', '600x600');
+  } catch {
+    return null;
+  }
+}
+
+async function fetchITunesSearchArt(title: string, artist: string): Promise<string | null> {
+  try {
+    const resp = await fetch(
+      `https://itunes.apple.com/search?term=${encodeURIComponent(`${title} ${artist}`)}&media=music&entity=album&limit=5`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const results = data?.results;
+    if (!Array.isArray(results) || results.length === 0) return null;
+    const artistLower = artist.toLowerCase();
+    const titleLower = title.toLowerCase();
+    for (const r of results) {
+      const rArtist = (r.artistName ?? '').toLowerCase();
+      const rTitle = (r.collectionName ?? '').toLowerCase();
+      if ((rArtist.includes(artistLower) || artistLower.includes(rArtist)) &&
+          (rTitle.includes(titleLower) || titleLower.includes(rTitle))) {
+        return (r.artworkUrl100 as string)?.replace('100x100', '600x600') ?? null;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchAlbumArtwork(tracks: SongSummary[], albumName: string, albumArtist: string): Promise<string | null> {
+  // Try Spotify links from tracks
   for (const track of tracks) {
-    if (!track.spotify_link) continue;
-    try {
-      const resp = await fetch(
-        `https://open.spotify.com/oembed?url=${encodeURIComponent(track.spotify_link)}`,
-        { signal: AbortSignal.timeout(5000) },
-      );
-      if (!resp.ok) continue;
-      const data = await resp.json();
-      if (data.thumbnail_url) return data.thumbnail_url;
-    } catch {
-      // Try next track
+    if (track.spotify_link) {
+      const art = await fetchSpotifyArt(track.spotify_link);
+      if (art) return art;
     }
   }
-  return null;
+  // Try Apple Music links from tracks
+  for (const track of tracks) {
+    if (track.apple_music_link) {
+      const art = await fetchAppleMusicArt(track.apple_music_link);
+      if (art) return art;
+    }
+  }
+  // Fall back to iTunes Search by album name + artist
+  return fetchITunesSearchArt(albumName, albumArtist);
 }
 
 function groupSongsByAlbum(songs: SongSummary[]): Map<string, SongSummary[]> {
@@ -93,7 +154,9 @@ export async function fetchAllAlbums(artist: ArtistFilter = 'all'): Promise<Albu
   const albums = [...groups.entries()].map(([name, tracks]) => buildAlbumSummary(name, tracks));
 
   // Fetch artwork in parallel for all albums
-  const artworkPromises = [...groups.entries()].map(([, tracks]) => fetchAlbumArtwork(tracks));
+  const artworkPromises = [...groups.entries()].map(([name, tracks]) =>
+    fetchAlbumArtwork(tracks, name, albums.find(a => a.name === name)?.artist ?? ''),
+  );
   const artworks = await Promise.all(artworkPromises);
   for (let i = 0; i < albums.length; i++) {
     albums[i].artwork_url = artworks[i];
@@ -113,7 +176,7 @@ export async function fetchAlbumDetail(albumSlug: string, artist: ArtistFilter =
       const bpms = tracks.filter(t => t.bpm !== null).map(t => t.bpm!);
 
       // Fetch artwork for this album
-      const artworkUrl = await fetchAlbumArtwork(tracks);
+      const artworkUrl = await fetchAlbumArtwork(tracks, name, summary.artist);
 
       return {
         ...summary,
