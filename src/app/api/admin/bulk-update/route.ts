@@ -22,9 +22,12 @@ const FIELD_MAP: Record<string, { prop: string; type: 'number' | 'select' | 'ric
   total_streams: { prop: 'Total Streams', type: 'number' },
   spotify_link: { prop: 'Spotify Link', type: 'url' },
   apple_music_link: { prop: 'Apple Music Link', type: 'url' },
+  youtube_link: { prop: 'YouTube Link', type: 'url' },
   duration: { prop: 'Duration', type: 'rich_text' },
   popularity_score: { prop: 'Popularity Score', type: 'number' },
   mood: { prop: 'Mood Tags', type: 'multi_select' },
+  isrc: { prop: 'ISRC', type: 'rich_text' },
+  upc: { prop: 'UPC', type: 'rich_text' },
 };
 
 function buildProperties(fields: Record<string, unknown>) {
