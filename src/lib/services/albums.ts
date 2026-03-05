@@ -4,6 +4,17 @@ import { estimateRevenue } from '@/lib/services/revenue';
 import type { ArtistFilter } from '@/config/notion';
 import type { SongSummary, AlbumSummary, AlbumDetail } from '@/lib/types';
 
+// Known Apple Music artist IDs — prevents false matches from other artists
+// with the same name (e.g. a French artist also named "Jakke").
+const KNOWN_ITUNES_ARTIST_IDS = new Set([
+  1605573050, // Jakke / Jakke & matty co. / Jakke & Enjune / Jakke & GLITTER COWBOY
+  1451000650, // Enjune
+  1435672296, // Somelee (collab on Peace Of Mind)
+  276535457,  // NUAGE & Jakke
+  529631932,  // Jako Diaz & Jakke
+  368458259,  // Jack Trades & Jakke
+]);
+
 // ---------------------------------------------------------------------------
 // Normalize album names so variants like "All Ways, Always EP (Track 2) +
 // Standalone Single" group correctly under "All Ways, Always EP".
@@ -87,6 +98,8 @@ async function fetchITunesSearchArt(title: string, artist: string): Promise<stri
       const rTitle = stripReleaseSuffix(r.collectionName ?? '').toLowerCase();
       if ((rArtist.includes(artistLower) || artistLower.includes(rArtist)) &&
           (rTitle.includes(coreLower) || coreLower.includes(rTitle))) {
+        // Verify artist ID is known to avoid false matches from other artists with the same name
+        if (KNOWN_ITUNES_ARTIST_IDS.size > 0 && r.artistId && !KNOWN_ITUNES_ARTIST_IDS.has(r.artistId)) continue;
         return (r.artworkUrl100 as string)?.replace('100x100', '600x600') ?? null;
       }
     }
@@ -113,6 +126,7 @@ async function fetchITunesTrackArt(trackTitle: string, artist: string): Promise<
       const rTitle = (r.trackName ?? '').toLowerCase();
       if ((rArtist.includes(artistLower) || artistLower.includes(rArtist)) &&
           (rTitle.includes(titleLower) || titleLower.includes(rTitle))) {
+        if (KNOWN_ITUNES_ARTIST_IDS.size > 0 && r.artistId && !KNOWN_ITUNES_ARTIST_IDS.has(r.artistId)) continue;
         return (r.artworkUrl100 as string)?.replace('100x100', '600x600') ?? null;
       }
     }
