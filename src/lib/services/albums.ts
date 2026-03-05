@@ -59,10 +59,20 @@ async function fetchAppleMusicArt(url: string): Promise<string | null> {
   }
 }
 
+/** Strip common release-type suffixes for fuzzy title comparison */
+function stripReleaseSuffix(name: string): string {
+  return name
+    .replace(/\s*[-–—]\s*(single|ep|album)\s*$/i, '')
+    .replace(/\s*\((?:single|ep|album|[^)]*music[^)]*)\)\s*$/i, '')
+    .trim();
+}
+
 async function fetchITunesSearchArt(title: string, artist: string): Promise<string | null> {
   try {
+    // Use the core title (without "(Single)" etc.) for the search query
+    const coreTitle = stripReleaseSuffix(title);
     const resp = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(`${title} ${artist}`)}&media=music&entity=album&limit=5`,
+      `https://itunes.apple.com/search?term=${encodeURIComponent(`${coreTitle} ${artist}`)}&media=music&entity=album&limit=5`,
       { signal: AbortSignal.timeout(5000) },
     );
     if (!resp.ok) return null;
@@ -70,12 +80,12 @@ async function fetchITunesSearchArt(title: string, artist: string): Promise<stri
     const results = data?.results;
     if (!Array.isArray(results) || results.length === 0) return null;
     const artistLower = artist.toLowerCase();
-    const titleLower = title.toLowerCase();
+    const coreLower = coreTitle.toLowerCase();
     for (const r of results) {
       const rArtist = (r.artistName ?? '').toLowerCase();
-      const rTitle = (r.collectionName ?? '').toLowerCase();
+      const rTitle = stripReleaseSuffix(r.collectionName ?? '').toLowerCase();
       if ((rArtist.includes(artistLower) || artistLower.includes(rArtist)) &&
-          (rTitle.includes(titleLower) || titleLower.includes(rTitle))) {
+          (rTitle.includes(coreLower) || coreLower.includes(rTitle))) {
         return (r.artworkUrl100 as string)?.replace('100x100', '600x600') ?? null;
       }
     }
