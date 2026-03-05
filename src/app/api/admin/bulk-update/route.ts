@@ -14,9 +14,9 @@ import { toSlug } from '@/lib/utils/slug';
 //                   spotify_link (url), apple_music_link (url)
 // ---------------------------------------------------------------------------
 
-const FIELD_MAP: Record<string, { prop: string; type: 'number' | 'select' | 'url' }> = {
+const FIELD_MAP: Record<string, { prop: string; type: 'number' | 'select' | 'rich_text' | 'url' }> = {
   bpm: { prop: 'BPM', type: 'number' },
-  key: { prop: 'Key', type: 'select' },
+  key: { prop: 'Key', type: 'rich_text' },
   total_streams: { prop: 'Total Streams', type: 'number' },
   spotify_link: { prop: 'Spotify Link', type: 'url' },
   apple_music_link: { prop: 'Apple Music Link', type: 'url' },
@@ -31,6 +31,8 @@ function buildProperties(fields: Record<string, unknown>) {
       properties[mapping.prop] = { number: Number(value) };
     } else if (mapping.type === 'select') {
       properties[mapping.prop] = { select: { name: String(value) } };
+    } else if (mapping.type === 'rich_text') {
+      properties[mapping.prop] = { rich_text: [{ text: { content: String(value) } }] };
     } else if (mapping.type === 'url') {
       properties[mapping.prop] = { url: String(value) };
     }
