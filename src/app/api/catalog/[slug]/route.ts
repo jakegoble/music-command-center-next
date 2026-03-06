@@ -159,6 +159,7 @@ export async function GET(
       const p = page.properties;
       const title = getText(p['Song Title']) ?? '';
       const streams = getNumber(p['Total Streams']) ?? 0;
+      const youtubeViews = getNumber(p['YouTube Views']);
       const writerSplitsRaw = getText(p['Writer Splits']);
 
       // Fetch related entities in parallel
@@ -230,12 +231,19 @@ export async function GET(
         distributor: getSelect(p['Distributor']),
         total_streams: streams,
         platform_streams: streams > 0
-          ? Object.fromEntries(
-              Object.entries(PLATFORM_DISTRIBUTION).map(([plat, share]) => [
-                plat as StreamingPlatform,
-                Math.round(streams * share),
-              ]),
-            ) as PlatformStreams
+          ? (() => {
+              const estimated = Object.fromEntries(
+                Object.entries(PLATFORM_DISTRIBUTION).map(([plat, share]) => [
+                  plat as StreamingPlatform,
+                  Math.round(streams * share),
+                ]),
+              ) as PlatformStreams;
+              // Override youtube_music with real YouTube views when available
+              if (youtubeViews !== null && youtubeViews > 0) {
+                estimated.youtube_music = youtubeViews;
+              }
+              return estimated;
+            })()
           : null,
         popularity_score: getNumber(p['Popularity Score']),
         isrc: getText(p['ISRC']),

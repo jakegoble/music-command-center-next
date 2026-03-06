@@ -27,9 +27,11 @@ export function mapPageToSong(page: PageObjectResponse): SongSummary {
   const p = page.properties;
   const title = getText(p['Song Title']) ?? '';
   const streams = getNumber(p['Total Streams']) ?? 0;
+  const youtubeViews = getNumber(p['YouTube Views']);
 
-  // Estimate per-platform streams from total using distribution weights
-  const platformStreams: PlatformStreams | null = streams > 0
+  // Estimate per-platform streams from total using distribution weights,
+  // but override youtube_music with real YouTube views when available
+  let platformStreams: PlatformStreams | null = streams > 0
     ? Object.fromEntries(
         Object.entries(PLATFORM_DISTRIBUTION).map(([platform, share]) => [
           platform as StreamingPlatform,
@@ -37,6 +39,10 @@ export function mapPageToSong(page: PageObjectResponse): SongSummary {
         ]),
       ) as PlatformStreams
     : null;
+
+  if (platformStreams && youtubeViews !== null && youtubeViews > 0) {
+    platformStreams = { ...platformStreams, youtube_music: youtubeViews };
+  }
 
   return {
     id: page.id,
