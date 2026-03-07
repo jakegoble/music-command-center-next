@@ -199,40 +199,6 @@ export interface RoyaltyEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Client History types (Jon's CRM)
-// ---------------------------------------------------------------------------
-
-export interface ClientSummary {
-  id: string;
-  company_name: string;
-  industry: string | null;
-  company_size: string | null;
-  type: string[];
-  relationship_status: string | null;
-  warmth: string | null;
-  priority: string | null;
-  fit_score: string | null;
-  estimated_budget: string | null;
-  pitch_type: string | null;
-  how_originated: string | null;
-  would_repeat: string | null;
-  deal_value: number | null;
-  key_contact_name: string | null;
-  contact_title: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  hq_location: string | null;
-  website: string | null;
-  what_we_did: string | null;
-  when: string | null;
-  how_it_went: string | null;
-  notes: string | null;
-  venue_used: string | null;
-  referral_potential: string | null;
-  other_contacts: string | null;
-}
-
-// ---------------------------------------------------------------------------
 // API response types
 // ---------------------------------------------------------------------------
 

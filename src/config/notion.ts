@@ -5,16 +5,6 @@ export const NOTION_DBS = {
   LICENSING_CONTACTS: '5f4f4404-502d-4e8d-bd50-6a584255a2db',
   CONTRACTS: '1e0a4aaa-04a8-4726-abdd-da08e65d5514',
   ROYALTY_TRACKING: '3e233507-12c8-4038-aaef-d29b6792abfa',
-  // Jon's Client History — CRM database under Madrone Studios Command Center
-  // Properties: Company Name (title), Industry (select), Company Size (select),
-  //   Type (multi_select), Relationship Status (select), Warmth (select),
-  //   Priority (select), Fit Score (select), Estimated Budget (select),
-  //   Pitch Type (select), How Originated (select), Would They Do Another Deal? (select),
-  //   Deal Value (number/$), Key Contact Name (text), Contact Title (text),
-  //   Contact Email (email), Contact Phone (phone), HQ Location (text),
-  //   Website (url), What We Did (text), When (text), How It Went (text),
-  //   Notes (text), Venue Used (text), Referral Potential (text), Other Contacts (text)
-  CLIENT_HISTORY: 'd8d079f0-89fd-4b6c-94e8-6fb7d7ebd6d1',
   // Phase 2.4 — Create these databases in Notion, then paste IDs here.
   // Approval Queue: properties: Entity Type (select), Entity ID (rich_text),
   //   Entity Label (rich_text), Field Name (rich_text), Current Value (rich_text),
@@ -55,25 +45,33 @@ export const ARTIST_PROFILES: Record<Artist, {
     photo: '/artists/jakke.jpg',
     subtitle: 'Producer / Artist',
     dspLinks: {
-      spotify: 'https://open.spotify.com/artist/4J2F2H9mhFcaXDs64WCMxQ',
-      appleMusic: 'https://music.apple.com/us/artist/jakke/956093894',
+      spotify: 'https://open.spotify.com/artist/PLACEHOLDER_JAKKE',
+      appleMusic: 'https://music.apple.com/artist/PLACEHOLDER_JAKKE',
+      youtubeMusic: 'https://music.youtube.com/channel/PLACEHOLDER_JAKKE',
+      amazonMusic: 'https://music.amazon.com/artists/PLACEHOLDER_JAKKE',
+      tidal: 'https://tidal.com/artist/PLACEHOLDER_JAKKE',
+      soundcloud: 'https://soundcloud.com/PLACEHOLDER_JAKKE',
     },
   },
   Enjune: {
     photo: '/artists/enjune.jpg',
     subtitle: 'Artist / Writer',
     dspLinks: {
-      spotify: 'https://open.spotify.com/artist/0Q5H7S50NYFVJi7fewkoJs',
-      appleMusic: 'https://music.apple.com/us/artist/enjune/1451000650',
-      soundcloud: 'https://soundcloud.com/enjune-music',
+      spotify: 'https://open.spotify.com/artist/PLACEHOLDER_ENJUNE',
+      appleMusic: 'https://music.apple.com/artist/PLACEHOLDER_ENJUNE',
+      youtubeMusic: 'https://music.youtube.com/channel/PLACEHOLDER_ENJUNE',
+      amazonMusic: 'https://music.amazon.com/artists/PLACEHOLDER_ENJUNE',
+      tidal: 'https://tidal.com/artist/PLACEHOLDER_ENJUNE',
+      soundcloud: 'https://soundcloud.com/PLACEHOLDER_ENJUNE',
     },
   },
   'iLÜ': {
     photo: '/artists/ilu.jpg',
     subtitle: 'Electronic / Experimental',
     dspLinks: {
-      // Verify: https://open.spotify.com/artist/3503RbAqQKXejvipu9mOVw may be iLÜ
-      // Add confirmed links once verified by Jake
+      spotify: 'https://open.spotify.com/artist/PLACEHOLDER_ILU',
+      appleMusic: 'https://music.apple.com/artist/PLACEHOLDER_ILU',
+      youtubeMusic: 'https://music.youtube.com/channel/PLACEHOLDER_ILU',
     },
   },
 };
