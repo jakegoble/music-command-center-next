@@ -30,6 +30,7 @@ const NAV_SECTIONS = [
   {
     label: 'BUSINESS',
     links: [
+      { href: '/clients', label: 'Clients' },
       { href: '/contracts', label: 'Contracts' },
       { href: '/sync-pipeline', label: 'Sync Pipeline' },
       { href: '/content', label: 'Content' },
