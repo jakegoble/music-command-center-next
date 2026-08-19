@@ -17,6 +17,7 @@ const NAV_SECTIONS = [
       { href: '/streaming', label: 'Streaming' },
       { href: '/catalog', label: 'Catalog' },
       { href: '/catalog/albums', label: 'Albums', indent: true },
+      { href: '/registration', label: 'Registration' },
       { href: '/royalties', label: 'Revenue' },
     ],
   },

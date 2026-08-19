@@ -40,7 +40,12 @@ export interface SongSummary {
   ascap_registered: boolean;
   mlc_registered: boolean;
   soundexchange_registered: boolean;
+  songtrust_registered: boolean;
+  ppl_registered: boolean;
   youtube_content_id: boolean;
+  songwriters: string | null;
+  writer_splits: string | null;
+  sync_restrictions: string | null;
 }
 
 export interface SongDetail extends SongSummary {

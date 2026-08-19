@@ -78,7 +78,12 @@ export function mapPageToSong(page: PageObjectResponse): SongSummary {
     ascap_registered: getCheckbox(p['ASCAP Registered']),
     mlc_registered: getCheckbox(p['MLC Registered']),
     soundexchange_registered: getCheckbox(p['SoundExchange Registered']),
+    songtrust_registered: getCheckbox(p['Songtrust Registered']),
+    ppl_registered: getCheckbox(p['PPL Registered']),
     youtube_content_id: getCheckbox(p['YouTube Content ID']),
+    songwriters: getText(p['Songwriters']),
+    writer_splits: getText(p['Writer Splits']),
+    sync_restrictions: getText(p['Sync Restrictions']),
   };
 }
 
