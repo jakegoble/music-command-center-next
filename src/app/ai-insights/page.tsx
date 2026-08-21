@@ -15,7 +15,8 @@ function formatNumber(n: number): string {
   return n.toLocaleString();
 }
 
-function formatCurrency(n: number): string {
+function formatCurrency(n: number | null): string {
+  if (n === null) return 'unknown';
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 

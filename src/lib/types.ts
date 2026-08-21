@@ -36,7 +36,14 @@ export interface SongSummary {
   youtube_link: string | null;
   collaborator_count: number;
   contract_count: number;
-  estimated_revenue: number;
+  /** Revenue the recording generated across ALL rightsholders. Not Jake's share. */
+  estimated_gross_revenue: number;
+  /** Jake's estimated share. Null means ownership is unknown — render as "unknown", never 0. */
+  estimated_revenue: number | null;
+  /** Jake's writer share as a 0-1 fraction, or null when it cannot be determined. */
+  jake_share_pct: number | null;
+  /** Sum of all parsed writer shares. Should be ~100. Null when nothing parsed. */
+  splits_total: number | null;
   ascap_registered: boolean;
   mlc_registered: boolean;
   soundexchange_registered: boolean;
@@ -221,7 +228,12 @@ export interface CatalogStats {
   unreleased: number;
   in_progress: number;
   total_streams: number;
+  /** Jake's share where ownership is known. Works with unknown ownership are excluded. */
   total_estimated_revenue: number;
+  /** Revenue across all rightsholders. Not Jake's share. */
+  total_gross_revenue: number;
+  /** Streams on works where Jake's ownership could not be determined. */
+  unknown_ownership_streams: number;
   avg_bpm: number | null;
   sync_ready: number;
   has_atmos: number;

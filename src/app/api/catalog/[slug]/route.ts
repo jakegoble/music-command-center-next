@@ -14,7 +14,14 @@ import {
   getUrl,
   getRelationIds,
 } from '@/lib/clients/notion';
-import { estimateRevenue, parseWriterSplits, PLATFORM_DISTRIBUTION } from '@/lib/services/revenue';
+import {
+  estimateGrossRevenue,
+  estimateJakeRevenue,
+  jakeSharePct,
+  splitsTotal,
+  parseWriterSplits,
+  PLATFORM_DISTRIBUTION,
+} from '@/lib/services/revenue';
 import { toSlug } from '@/lib/services/songs';
 import { parseNotes } from '@/lib/utils/parseNotes';
 import { generateTrackDescription, generateHighlights } from '@/lib/utils/generateDescription';
@@ -260,7 +267,10 @@ export async function GET(
         youtube_link: getUrl(p['YouTube Link']),
         collaborator_count: collabIds.length,
         contract_count: contractIds.length,
-        estimated_revenue: estimateRevenue(streams),
+        estimated_gross_revenue: estimateGrossRevenue(streams),
+        estimated_revenue: estimateJakeRevenue(streams, jakeSharePct(writerSplitsRaw)),
+        jake_share_pct: jakeSharePct(writerSplitsRaw),
+        splits_total: splitsTotal(writerSplitsRaw),
         ascap_registered: getCheckbox(p['ASCAP Registered']),
         mlc_registered: getCheckbox(p['MLC Registered']),
         soundexchange_registered: getCheckbox(p['SoundExchange Registered']),

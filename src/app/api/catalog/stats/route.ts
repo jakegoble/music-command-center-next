@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseArtistParam } from '@/config/notion';
 import { fetchAllSongs, deduplicateSongs } from '@/lib/services/songs';
-import { estimateRevenue } from '@/lib/services/revenue';
+import { estimateGrossRevenue } from '@/lib/services/revenue';
 import type { CatalogStats } from '@/lib/types';
 
 export async function GET(request: NextRequest) {
@@ -67,7 +67,13 @@ export async function GET(request: NextRequest) {
       unreleased: songs.filter((s) => s.status === 'Unreleased').length,
       in_progress: songs.filter((s) => s.status === 'In Progress').length,
       total_streams: totalStreams,
-      total_estimated_revenue: estimateRevenue(totalStreams),
+      // Jake's share where ownership is known; unknown works are excluded, not assumed.
+      total_estimated_revenue:
+        Math.round(songs.reduce((sum, s) => sum + (s.estimated_revenue ?? 0), 0) * 100) / 100,
+      total_gross_revenue: estimateGrossRevenue(totalStreams),
+      unknown_ownership_streams: songs
+        .filter((s) => s.estimated_revenue === null)
+        .reduce((sum, s) => sum + s.total_streams, 0),
       avg_bpm: bpms.length > 0 ? Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) : null,
       sync_ready: songs.filter((s) => s.sync_available).length,
       has_atmos: songs.filter((s) => s.atmos_mix).length,

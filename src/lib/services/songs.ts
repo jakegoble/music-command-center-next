@@ -12,7 +12,13 @@ import {
   getUrl,
   getRelationIds,
 } from '@/lib/clients/notion';
-import { estimateRevenue, PLATFORM_DISTRIBUTION } from '@/lib/services/revenue';
+import {
+  estimateGrossRevenue,
+  estimateJakeRevenue,
+  jakeSharePct,
+  splitsTotal,
+  PLATFORM_DISTRIBUTION,
+} from '@/lib/services/revenue';
 import type { SongSummary, PlatformStreams, StreamingPlatform } from '@/lib/types';
 import type { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints';
 import { toSlug } from '@/lib/utils/slug';
@@ -74,7 +80,10 @@ export function mapPageToSong(page: PageObjectResponse): SongSummary {
     youtube_link: getUrl(p['YouTube Link']),
     collaborator_count: getRelationIds(p['Collaborators']).length,
     contract_count: getRelationIds(p['Contracts']).length,
-    estimated_revenue: estimateRevenue(streams),
+    estimated_gross_revenue: estimateGrossRevenue(streams),
+    estimated_revenue: estimateJakeRevenue(streams, jakeSharePct(getText(p['Writer Splits']))),
+    jake_share_pct: jakeSharePct(getText(p['Writer Splits'])),
+    splits_total: splitsTotal(getText(p['Writer Splits'])),
     ascap_registered: getCheckbox(p['ASCAP Registered']),
     mlc_registered: getCheckbox(p['MLC Registered']),
     soundexchange_registered: getCheckbox(p['SoundExchange Registered']),

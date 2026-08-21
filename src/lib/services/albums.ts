@@ -1,6 +1,6 @@
 import { fetchAllSongs, deduplicateSongs } from './songs';
 import { toSlug } from '@/lib/utils/slug';
-import { estimateRevenue } from '@/lib/services/revenue';
+import { estimateGrossRevenue } from '@/lib/services/revenue';
 import type { ArtistFilter } from '@/config/notion';
 import type { SongSummary, AlbumSummary, AlbumDetail } from '@/lib/types';
 
@@ -196,7 +196,9 @@ function buildAlbumSummary(name: string, tracks: SongSummary[]): AlbumSummary {
     artist: primaryArtist,
     track_count: tracks.length,
     total_streams: totalStreams,
-    estimated_revenue: estimateRevenue(totalStreams),
+    // Album-level figures are gross across all rightsholders; per-track Jake
+    // shares vary and are shown on the track rows.
+    estimated_revenue: estimateGrossRevenue(totalStreams),
     release_date: dates[0] ?? null,
     genres,
     status,

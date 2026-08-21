@@ -6,7 +6,8 @@ import { useArtistContext } from '@/lib/contexts/ArtistContext';
 import { artistToParam, ARTIST_COLORS, type Artist } from '@/config/notion';
 import type { RoyaltyEntry } from '@/lib/types';
 
-function formatCurrency(n: number): string {
+function formatCurrency(n: number | null): string {
+  if (n === null) return 'unknown';
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseArtistParam } from '@/config/notion';
 import { fetchRoyalties } from '@/lib/services/royalties';
 import { fetchAllSongs } from '@/lib/services/songs';
-import { estimateRevenue, PLATFORM_RATES, PLATFORM_DISTRIBUTION } from '@/lib/services/revenue';
+import { PLATFORM_RATES, PLATFORM_DISTRIBUTION } from '@/lib/services/revenue';
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,18 +45,26 @@ export async function GET(request: NextRequest) {
     // No actual royalty data — compute estimated revenue from song streams
     const songs = await fetchAllSongs(artist);
     const totalStreams = songs.reduce((sum, s) => sum + s.total_streams, 0);
-    const totalEstRevenue = estimateRevenue(totalStreams);
+    // Jake's share, summed per song. Songs with unknown ownership are excluded
+    // from the total and reported separately rather than assumed to be 100% his.
+    let totalEstRevenue = 0;
+    let unknownOwnershipStreams = 0;
+    for (const s of songs) {
+      const share = s.estimated_revenue;
+      if (share === null) unknownOwnershipStreams += s.total_streams;
+      else totalEstRevenue += share;
+    }
 
     // Estimate revenue by platform source using distribution weights
     const bySource: Record<string, number> = {};
     const platformLabels: Record<string, string> = {
-      spotify: 'Spotify (est.)',
-      apple_music: 'Apple Music (est.)',
-      youtube_music: 'YouTube Music (est.)',
-      amazon_music: 'Amazon Music (est.)',
-      tidal: 'Tidal (est.)',
-      deezer: 'Deezer (est.)',
-      other: 'Other (est.)',
+      spotify: 'Spotify (gross est.)',
+      apple_music: 'Apple Music (gross est.)',
+      youtube_music: 'YouTube Music (gross est.)',
+      amazon_music: 'Amazon Music (gross est.)',
+      tidal: 'Tidal (gross est.)',
+      deezer: 'Deezer (gross est.)',
+      other: 'Other (gross est.)',
     };
     for (const [platform, share] of Object.entries(PLATFORM_DISTRIBUTION)) {
       const rate = PLATFORM_RATES[platform] ?? 0.003;
@@ -70,19 +78,20 @@ export async function GET(request: NextRequest) {
     const byQuarter: Record<string, number> = {};
     for (const song of songs) {
       const year = song.release_date?.slice(0, 4) ?? 'Unknown';
-      byQuarter[year] = (byQuarter[year] ?? 0) + estimateRevenue(song.total_streams);
+      byQuarter[year] = (byQuarter[year] ?? 0) + (song.estimated_revenue ?? 0);
     }
 
     // Estimate revenue by artist
     const byArtist: Record<string, number> = {};
     for (const song of songs) {
       const a = song.artist || 'Unknown';
-      byArtist[a] = (byArtist[a] ?? 0) + estimateRevenue(song.total_streams);
+      byArtist[a] = (byArtist[a] ?? 0) + (song.estimated_revenue ?? 0);
     }
 
     return NextResponse.json({
       entries: [],
       total_revenue: Math.round(totalEstRevenue * 100) / 100,
+      unknown_ownership_streams: unknownOwnershipStreams,
       total_streams: totalStreams,
       by_source: bySource,
       by_quarter: byQuarter,
