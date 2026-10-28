@@ -22,6 +22,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Strip whitespace/line breaks that sneak in when IDs are pasted from a wrapped UI.
       clientId: process.env.AUTH_GOOGLE_ID?.replace(/\s+/g, ''),
       clientSecret: process.env.AUTH_GOOGLE_SECRET?.replace(/\s+/g, ''),
+      // Always show Google's account picker so the right account can be chosen.
+      authorization: { params: { prompt: 'select_account' } },
     }),
   ],
   trustHost: true,
