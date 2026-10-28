@@ -1,4 +1,5 @@
 'use client';
+import { signOut } from 'next-auth/react';
 
 import { useState } from 'react';
 import Image from 'next/image';
@@ -211,8 +212,15 @@ export function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-gray-800/50 px-5 py-4 text-xs text-gray-600">
-          &copy; 2026 Enjune Music
+        <div className="flex items-center justify-between border-t border-gray-800/50 px-5 py-4 text-xs text-gray-600">
+          <span>&copy; 2026 Enjune Music</span>
+          <button
+            type="button"
+            onClick={() => signOut({ redirectTo: '/login' })}
+            className="text-gray-500 hover:text-gray-300"
+          >
+            Sign out
+          </button>
         </div>
       </aside>
     </>

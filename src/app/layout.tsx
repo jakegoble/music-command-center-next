@@ -5,6 +5,7 @@ import { ArtistProvider } from "@/lib/contexts/ArtistContext";
 import { Sidebar } from "@/components/Sidebar";
 import { ArtistBadge } from "@/components/ArtistBadge";
 import "./globals.css";
+import { auth } from "@/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,11 +22,21 @@ export const metadata: Metadata = {
   description: "Catalog & Sync — Music IP Intelligence Platform",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+  if (!session) {
+    return (
+      <html lang="en">
+        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+          <main className="p-4 md:p-6">{children}</main>
+        </body>
+      </html>
+    );
+  }
   return (
     <html lang="en">
       <body
