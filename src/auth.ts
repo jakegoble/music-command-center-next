@@ -17,7 +17,13 @@ function allowedEmails(): Set<string> {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  providers: [Google],
+  providers: [
+    Google({
+      // Strip whitespace/line breaks that sneak in when IDs are pasted from a wrapped UI.
+      clientId: process.env.AUTH_GOOGLE_ID?.replace(/\s+/g, ''),
+      clientSecret: process.env.AUTH_GOOGLE_SECRET?.replace(/\s+/g, ''),
+    }),
+  ],
   trustHost: true,
   pages: { signIn: '/login', error: '/login' },
   session: { strategy: 'jwt', maxAge: 60 * 60 * 24 * 30 },
