@@ -60,7 +60,7 @@ const MLC_OVERCLAIMS: Record<
   'release': { code: 'RP55XS', claimed: 100, actual: 50, status: 'duplicate' },
   'father world (mama earth)': { code: 'FC2ZRC', claimed: 100, actual: 50, status: 'duplicate' },
   // Corrected at the MLC on 2026-11-03; waiting for the MLC to accept the edit.
-  'fuck me up': { code: 'FC2ZL5', claimed: 100, actual: 97, status: 'fix_submitted', note: 'REF 14922499 (97/3 with Heringer)' },
+  'fuck me up (2019 - original solo version)': { code: 'FC2ZL5', claimed: 100, actual: 97, status: 'fix_submitted', note: 'REF 14922499 (97/3 with Heringer)' },
   'how do you love (big picture mix)': { code: 'HW7FGA', claimed: 100, actual: 32, status: 'fix_submitted', note: 'REF 14921101' },
 };
 

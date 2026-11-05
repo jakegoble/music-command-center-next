@@ -91,9 +91,32 @@ function isJake(name: string): boolean {
 export function parseWriterSplits(raw: string | null): WriterSplit[] {
   if (!raw) return [];
 
+  // "33.33% each — A / pub (IPI …) | B / pub | C / pub": one share for every listed writer.
+  const each = raw.match(/^\s*(\d+(?:\.\d+)?)\s*%\s*each\s*[—–-]\s*(.+)$/is);
+  if (each) {
+    const pct = parseFloat(each[1]);
+    const names = each[2]
+      .split('|')
+      .map((c) => c.split(/\s\/\s/)[0].replace(/\(.*$/, '').trim())
+      .filter((n) => /[A-Za-zÀ-ÿ]/.test(n));
+    if (names.length) return names.map((name) => ({ name, percentage: pct, ipi: null, pro: null }));
+  }
+
+  // "50/50 — A (pub) / B (pub; …)": a ratio followed by the writers in the same order.
+  const ratio = raw.match(/\b(\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)+)\s*[—–-]\s*([^.]+)/);
+  if (ratio && !/\d\s*%/.test(raw.slice(0, ratio.index ?? 0) + ratio[0])) {
+    const pcts = ratio[1].split('/').map(parseFloat);
+    const names = ratio[2]
+      .split(/\s\/\s(?![^(]*\))/)
+      .map((n) => n.replace(/\(.*$/, '').trim());
+    if (names.length === pcts.length) {
+      return names.map((name, i) => ({ name, percentage: pcts[i], ipi: null, pro: null }));
+    }
+  }
+
   // Cut trailing commentary that follows an em dash or a "Publishers:" marker,
   // so publisher percentages are not mistaken for writer shares.
-  const writerPart = raw.split(/—|\bPublishers?:|\bMaster(?:\s+royalty)?:/i)[0] ?? raw;
+  const writerPart = raw.split(/—|\bPublishers?\b|\bMaster(?:\s+royalty)?:/i)[0] ?? raw;
 
   const out: WriterSplit[] = [];
   const seen = new Set<string>();
