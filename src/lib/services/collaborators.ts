@@ -13,7 +13,7 @@ import {
 import type { CollaboratorDetail, SongSummary } from '@/lib/types';
 import type { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints';
 import { toSlug, fetchAllSongs } from '@/lib/services/songs';
-import { estimateRevenue } from '@/lib/services/revenue';
+import { estimateGrossRevenue } from '@/lib/services/revenue';
 
 interface RawCollaborator extends CollaboratorDetail {
   _songRelationIds: string[];
@@ -70,8 +70,9 @@ export async function fetchAllCollaborators(): Promise<CollaboratorDetail[]> {
         ...collab,
         song_count: _songRelationIds.length,
         total_streams: streams,
-        estimated_revenue: estimateRevenue(streams),
-        songs: linkedSongs.map(s => ({ title: s.title, slug: s.slug, artist: s.artist })),
+        // Gross across all rightsholders of this collaborator's songs — not their share or Jake's.
+        estimated_revenue: estimateGrossRevenue(streams),
+        songs: linkedSongs.map(s => ({ title: s.title, slug: s.slug, artist: s.artist, streams: s.total_streams })),
       };
     });
   });

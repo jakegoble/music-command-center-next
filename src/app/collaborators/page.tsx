@@ -1,5 +1,6 @@
 'use client';
 
+import { BLENDED_RATE } from '@/lib/services/revenue';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
@@ -93,8 +94,11 @@ export default function CollaboratorsPage() {
 
   // KPIs
   const totalCollabs = collaborators.length;
-  const totalCollabStreams = collaborators.reduce((s, c) => s + c.total_streams, 0);
-  const totalCollabRevenue = collaborators.reduce((s, c) => s + c.estimated_revenue, 0);
+  // Count each shared song once, however many collaborators are on it.
+  const uniqueSongs = new Map<string, number>();
+  for (const c of collaborators) for (const s of c.songs ?? []) uniqueSongs.set(s.slug || s.title, s.streams ?? 0);
+  const totalCollabStreams = [...uniqueSongs.values()].reduce((a, b) => a + b, 0);
+  const totalCollabRevenue = Math.round(totalCollabStreams * BLENDED_RATE * 100) / 100;
   const topCollab = sorted.length > 0 ? sorted[0] : null;
   const activeAgreements = collaborators.filter(c => c.agreement_status === 'Active').length;
 
@@ -137,8 +141,8 @@ export default function CollaboratorsPage() {
         {[
           { label: 'Total', value: totalCollabs.toString(), color: 'text-blue-400', border: 'border-l-blue-500' },
           { label: 'Active Agreements', value: activeAgreements.toString(), color: 'text-green-400', border: 'border-l-green-500' },
-          { label: 'Total Streams', value: formatNumber(totalCollabStreams), color: 'text-purple-400', border: 'border-l-purple-500' },
-          { label: 'Est. Revenue', value: formatCurrency(totalCollabRevenue), color: 'text-emerald-400', border: 'border-l-emerald-500' },
+          { label: 'Streams (shared songs)', value: formatNumber(totalCollabStreams), color: 'text-purple-400', border: 'border-l-purple-500' },
+          { label: 'Gross (shared songs)', value: formatCurrency(totalCollabRevenue), color: 'text-emerald-400', border: 'border-l-emerald-500' },
           { label: 'Top Collaborator', value: topCollab?.name ?? '\u2014', color: 'text-orange-400', border: 'border-l-orange-500' },
         ].map(kpi => (
           <div key={kpi.label} className={`rounded-xl border border-gray-700/50 border-l-4 ${kpi.border} bg-gray-800/50 p-4`}>
@@ -217,7 +221,7 @@ export default function CollaboratorsPage() {
                 <th className="hidden px-3 py-3 md:table-cell">PRO</th>
                 <th className="cursor-pointer px-3 py-3 hover:text-gray-300" onClick={() => handleSort('song_count')}>Songs{sortArrow('song_count')}</th>
                 <th className="cursor-pointer hidden px-3 py-3 hover:text-gray-300 md:table-cell" onClick={() => handleSort('total_streams')}>Streams{sortArrow('total_streams')}</th>
-                <th className="cursor-pointer hidden px-3 py-3 hover:text-gray-300 lg:table-cell" onClick={() => handleSort('estimated_revenue')}>Est. Revenue{sortArrow('estimated_revenue')}</th>
+                <th className="cursor-pointer hidden px-3 py-3 hover:text-gray-300 lg:table-cell" onClick={() => handleSort('estimated_revenue')}>Gross (their songs){sortArrow('estimated_revenue')}</th>
                 <th className="px-3 py-3">Agreement</th>
               </tr>
             </thead>

@@ -4,6 +4,30 @@ import { fetchRoyalties } from '@/lib/services/royalties';
 import { fetchAllSongs } from '@/lib/services/songs';
 import { PLATFORM_RATES, PLATFORM_DISTRIBUTION } from '@/lib/services/revenue';
 
+const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+
+/**
+ * A short, sortable chart label ("2026 Q2"). Uses the Quarter select when set;
+ * otherwise reads the first date in the free-text Period ("April 2026 — …",
+ * "… through 2026-10-28", "Q3 2025"). Falls back to "Undated" rather than
+ * using the whole Period note as a label.
+ */
+function quarterLabel(quarter: string | null, period: string | null): string {
+  if (quarter) return quarter;
+  const t = period ?? '';
+  let m = t.match(/\bQ([1-4])\s*[-/ ]?\s*(20\d{2})\b/i);
+  if (m) return `${m[2]} Q${m[1]}`;
+  m = t.match(/\b(20\d{2})\s*[-/ ]?\s*Q([1-4])\b/i);
+  if (m) return `${m[1]} Q${m[2]}`;
+  m = t.match(/\b(20\d{2})-(\d{2})(?:-\d{2})?\b/);
+  if (m) return `${m[1]} Q${Math.ceil(parseInt(m[2], 10) / 3)}`;
+  m = t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?:\d{1,2},?\s+)?(20\d{2})\b/i);
+  if (m) return `${m[2]} Q${Math.ceil((MONTHS.indexOf(m[1].toLowerCase()) + 1) / 3)}`;
+  m = t.match(/\b(20\d{2})\b/);
+  if (m) return m[1];
+  return 'Undated';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
@@ -29,7 +53,7 @@ export async function GET(request: NextRequest) {
 
       const byQuarter: Record<string, number> = {};
       for (const e of entries) {
-        const key = e.quarter ?? e.period ?? 'Unknown';
+        const key = quarterLabel(e.quarter, e.period);
         byQuarter[key] = (byQuarter[key] ?? 0) + e.total;
       }
 

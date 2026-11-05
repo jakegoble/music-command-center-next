@@ -159,7 +159,7 @@ export interface CollaboratorDetail extends CollaboratorSummary {
   phone: string | null;
   total_streams: number;
   estimated_revenue: number;
-  songs: { title: string; slug: string; artist: string }[];
+  songs: { title: string; slug: string; artist: string; streams: number }[];
 }
 
 // ---------------------------------------------------------------------------
