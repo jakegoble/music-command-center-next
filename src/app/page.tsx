@@ -104,7 +104,7 @@ export default function Dashboard() {
       onClick={() => setDemoData(prev => !prev)}
       className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:border-gray-600 hover:text-gray-300"
     >
-      <span>Demo Data</span>
+      <span>Live data</span>
       <div className={`relative h-5 w-9 rounded-full transition-colors ${demoData ? 'bg-green-600' : 'bg-gray-600'}`}>
         <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${demoData ? 'translate-x-4' : 'translate-x-0.5'}`} />
       </div>
@@ -124,8 +124,8 @@ export default function Dashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" />
             </svg>
           </div>
-          <p className="mt-4 text-lg font-medium text-gray-400">Demo data is turned off</p>
-          <p className="mt-1 text-sm text-gray-500">Toggle Demo Data on to view sample dashboard content.</p>
+          <p className="mt-4 text-lg font-medium text-gray-400">Live data is turned off</p>
+          <p className="mt-1 text-sm text-gray-500">Turn Live data on to load the catalog from Notion.</p>
         </div>
       </div>
     );
