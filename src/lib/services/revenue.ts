@@ -120,6 +120,8 @@ export function parseWriterSplits(raw: string | null): WriterSplit[] {
     name = name.replace(/\bIPI#?\s*\d+/gi, '');
     name = name.replace(new RegExp(`\\b(${PRO_NAMES.join('|')})\\b`, 'gi'), '');
     name = name.replace(/[\s,+\-–:/]+$/, '').trim();
+    // Notes like "(email thread, 2026-08-28): Jake Goble" — keep only the name after the last colon.
+    if (name.includes(':')) name = name.slice(name.lastIndexOf(':') + 1).trim();
 
     if (!name || !/[A-Za-zÀ-ÿ]/.test(name) || !Number.isFinite(percentage)) continue;
 
@@ -127,8 +129,9 @@ export function parseWriterSplits(raw: string | null): WriterSplit[] {
     if (seen.has(key)) continue;
     seen.add(key);
 
-    const ipiMatch = raw.match(new RegExp(`${name}[^|]{0,60}?IPI#?\\s*(\\d{9,11})`, 'i'));
-    const proMatch = raw.match(new RegExp(`${name}[^|]{0,60}?\\b(${PRO_NAMES.join('|')})\\b`, 'i'));
+    const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const ipiMatch = raw.match(new RegExp(`${safe}[^|]{0,60}?IPI#?\\s*(\\d{9,11})`, 'i'));
+    const proMatch = raw.match(new RegExp(`${safe}[^|]{0,60}?\\b(${PRO_NAMES.join('|')})\\b`, 'i'));
 
     out.push({
       name,
