@@ -48,13 +48,20 @@ function coverage(song: SongSummary): number {
  * so the work looks healthy, but the claim is disputed and the money is held.
  * Keyed by MLC song code, which is stable, rather than by title.
  */
-const MLC_OVERCLAIMS: Record<string, { code: string; claimed: number; actual: number }> = {
-  'waves': { code: 'W64ACJ', claimed: 100, actual: 25 },
-  'sugar tide': { code: 'SW4YBM', claimed: 100, actual: 33.33 },
-  'fuck me up': { code: 'FC2ZL5', claimed: 100, actual: 47.5 },
-  'how do you love (big picture mix)': { code: 'HW7FGA', claimed: 100, actual: 32 },
-  'release': { code: 'RP55XS', claimed: 100, actual: 50 },
-  'father world (mama earth)': { code: 'FC2ZRC', claimed: 100, actual: 50 },
+type OverclaimStatus = 'open' | 'fix_submitted' | 'duplicate';
+
+const MLC_OVERCLAIMS: Record<
+  string,
+  { code: string; claimed: number; actual: number; status: OverclaimStatus; note?: string }
+> = {
+  // Old JAKE GOBLE registrations sitting beside the correct work. They need removing, not editing.
+  'waves': { code: 'W64ACJ', claimed: 100, actual: 25, status: 'duplicate' },
+  'sugar tide': { code: 'SW4YBM', claimed: 100, actual: 33.33, status: 'duplicate' },
+  'release': { code: 'RP55XS', claimed: 100, actual: 50, status: 'duplicate' },
+  'father world (mama earth)': { code: 'FC2ZRC', claimed: 100, actual: 50, status: 'duplicate' },
+  // Corrected at the MLC on 2026-11-03; waiting for the MLC to accept the edit.
+  'fuck me up': { code: 'FC2ZL5', claimed: 100, actual: 97, status: 'fix_submitted', note: 'REF 14922499 (97/3 with Heringer)' },
+  'how do you love (big picture mix)': { code: 'HW7FGA', claimed: 100, actual: 32, status: 'fix_submitted', note: 'REF 14921101' },
 };
 
 function overclaim(song: SongSummary) {
@@ -147,7 +154,7 @@ export default function RegistrationPage() {
     ).length;
     const none = released.filter((s) => coverage(s) === 0).length;
     const noMlc = released.filter((s) => !s.mlc_registered).length;
-    const over = released.filter((s) => overclaim(s)).length;
+    const over = released.filter((s) => { const o = overclaim(s); return o && o.status !== 'fix_submitted'; }).length;
     return { total, fully, none, noMlc, over, atRisk: unregisteredStreams(released) };
   }, [released]);
 
@@ -288,9 +295,24 @@ export default function RegistrationPage() {
                       </div>
                       {oc && (
                         <div className="mt-1 rounded-md border border-orange-900/60 bg-orange-950/30 px-2 py-1 text-xs text-orange-300">
-                          <b>Overclaimed.</b> MLC work <code>{oc.code}</code> claims{' '}
-                          {oc.claimed}% — actual share is {oc.actual}%. Correct via the
-                          Overclaims Tool before this pays.
+                          {oc.status === 'fix_submitted' ? (
+                            <>
+                              <b>Fix submitted 2026-11-03.</b> MLC work <code>{oc.code}</code> corrected
+                              from {oc.claimed}% to {oc.actual}%{oc.note ? ` — ${oc.note}` : ''}. Waiting on
+                              MLC acceptance.
+                            </>
+                          ) : oc.status === 'duplicate' ? (
+                            <>
+                              <b>Duplicate at the MLC.</b> Old work <code>{oc.code}</code> claims{' '}
+                              {oc.claimed}% (actual {oc.actual}%). Ask MLC support to remove it.
+                            </>
+                          ) : (
+                            <>
+                              <b>Overclaimed.</b> MLC work <code>{oc.code}</code> claims{' '}
+                              {oc.claimed}% — actual share is {oc.actual}%. Correct via the
+                              Overclaims Tool before this pays.
+                            </>
+                          )}
                         </div>
                       )}
                       {splitsSuspect(song) && (
