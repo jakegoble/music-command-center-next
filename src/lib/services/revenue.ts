@@ -92,7 +92,7 @@ export function parseWriterSplits(raw: string | null): WriterSplit[] {
   if (!raw) return [];
 
   // "33.33% each — A / pub (IPI …) | B / pub | C / pub": one share for every listed writer.
-  const each = raw.match(/^\s*(\d+(?:\.\d+)?)\s*%\s*each\s*[—–-]\s*(.+)$/is);
+  const each = raw.match(/^\s*(\d+(?:\.\d+)?)\s*%\s*each\s*[—–-]\s*([\s\S]+)$/i);
   if (each) {
     const pct = parseFloat(each[1]);
     const names = each[2]
